@@ -62,6 +62,24 @@
     scope.querySelectorAll('[data-ws-view]').forEach(btn=>{ if(btn.dataset.bound) return; btn.dataset.bound='1'; btn.addEventListener('click',async()=>{ try{ const html=await fetchHtml(btn.dataset.wsView,'view',btn.dataset.id); modalShell('Record Details',html); }catch(e){showNotice('danger',e.message);} }); });
     scope.querySelectorAll('[data-ws-edit]').forEach(btn=>{ if(btn.dataset.bound) return; btn.dataset.bound='1'; btn.addEventListener('click',async()=>{ try{ const html=await fetchHtml(btn.dataset.wsEdit,'edit',btn.dataset.id); const old=document.getElementById('workspaceEditMount'); old?.remove(); const mount=document.createElement('div'); mount.id='workspaceEditMount'; mount.innerHTML=html; document.body.appendChild(mount); const modalEl=mount.querySelector('.modal'); new bootstrap.Modal(modalEl).show(); modalEl.addEventListener('hidden.bs.modal',()=>mount.remove(),{once:true}); bindInside(mount); }catch(e){showNotice('danger',e.message);} }); });
     scope.querySelectorAll('[data-ws-approve-proposal]').forEach(btn=>{ if(btn.dataset.bound) return; btn.dataset.bound='1'; btn.addEventListener('click',async()=>{ if(!confirm('Approve this proposal and create/link a project file?')) return; await postAction({module:'proposals',action:'approve',id:btn.dataset.wsApproveProposal}); }); });
+    scope.querySelectorAll('[data-module]').forEach(el=>{ if(el.dataset.boundModule) return; el.dataset.boundModule='1'; el.addEventListener('click',()=>load(el.dataset.module)); });
+    scope.querySelectorAll('[data-emp-cat]').forEach(btn=>{ if(btn.dataset.boundCat) return; btn.dataset.boundCat='1'; btn.addEventListener('click',()=>{ const host=btn.closest('#workspaceContent')||scope; host.querySelectorAll('[data-emp-cat]').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); host.querySelectorAll('[data-emp-pane]').forEach(p=>p.classList.toggle('active',p.dataset.empPane===btn.dataset.empCat)); }); });
+    scope.querySelectorAll('[data-attendance-date]').forEach(inp=>{ if(inp.dataset.boundDate) return; inp.dataset.boundDate='1'; inp.addEventListener('change',()=>{ const url=new URL(location.href); url.hash='attendance'; history.replaceState(null,'',url.pathname+url.search+'#attendance'); const api=new URL(window.MB_WORKSPACE.api, window.location.href); api.searchParams.set('module','attendance'); api.searchParams.set('date',inp.value); content.innerHTML='<div class="text-center text-muted py-5">Loading...</div>'; fetch(api,{headers:{'X-Requested-With':'fetch'}}).then(r=>r.text()).then(html=>{content.innerHTML=html; bindContent();}); }); });
+    scope.querySelectorAll('[data-att-date]').forEach(btn=>{ if(btn.dataset.boundCal) return; btn.dataset.boundCal='1'; btn.addEventListener('click',()=>{ const inp=scope.querySelector('[data-attendance-date]'); if(inp){ inp.value=btn.dataset.attDate; inp.dispatchEvent(new Event('change')); } }); });
+    scope.querySelectorAll('[data-payroll-filter]').forEach(form=>{ if(form.dataset.boundPayroll) return; form.dataset.boundPayroll='1'; form.addEventListener('submit',e=>{ e.preventDefault(); const fd=new FormData(form); const api=new URL(window.MB_WORKSPACE.api, window.location.href); api.searchParams.set('module','payroll'); api.searchParams.set('start',fd.get('start')); api.searchParams.set('end',fd.get('end')); content.innerHTML='<div class="text-center text-muted py-5">Loading...</div>'; fetch(api,{headers:{'X-Requested-With':'fetch'}}).then(r=>r.text()).then(html=>{content.innerHTML=html; bindContent();}); }); });
+    scope.querySelectorAll('[data-job-title-select]').forEach(sel=>{ if(sel.dataset.boundJob) return; sel.dataset.boundJob='1'; sel.addEventListener('change',()=>{ const opt=sel.selectedOptions[0]; const form=sel.closest('form'); if(!opt||!form) return; if(opt.dataset.rate) form.elements['salary_rate'].value=opt.dataset.rate; if(opt.dataset.rateType) form.elements['rate_type'].value=opt.dataset.rateType; if(opt.dataset.category) form.elements['category'].value=opt.dataset.category; if(opt.dataset.department) form.elements['department_id'].value=opt.dataset.department; }); });
+    scope.querySelectorAll('[data-photo-input]').forEach(inp=>{
+      if(inp.dataset.boundPhoto) return;
+      inp.dataset.boundPhoto='1';
+      inp.addEventListener('change',()=>{
+        const file=inp.files&&inp.files[0];
+        const panel=inp.closest('.employee-photo-panel');
+        let preview=panel?.querySelector('.employee-photo-preview');
+        if(!preview || !panel) return;
+        preview.classList.add('employee-photo-preview-fallback');
+        preview.innerHTML=file ? `<span class="employee-photo-preview-label">${escapeHtml(file.name)}</span>` : '<span>Photo</span>';
+      });
+    });
     scope.querySelectorAll('[data-estimate-builder]').forEach(initEstimateBuilder);
     scope.querySelectorAll('[data-proposal-builder]').forEach(initProposalBuilder);
   }

@@ -245,7 +245,12 @@ if (!function_exists('ensure_roles_permissions_tables')) {
         }
 
         $permStmt = $pdo->prepare("INSERT IGNORE INTO role_permissions (role_slug, permission_key) VALUES (?, ?)");
+        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM role_permissions WHERE role_slug = ?");
         foreach (default_role_permissions() as $roleSlug => $permissions) {
+            $countStmt->execute([$roleSlug]);
+            if ((int)$countStmt->fetchColumn() > 0) {
+                continue;
+            }
             foreach ($permissions as $permission) {
                 $permStmt->execute([$roleSlug, $permission]);
             }
@@ -280,6 +285,10 @@ if (!function_exists('current_user_permissions')) {
             WHERE ur.user_id = ?");
         $st->execute([(int)$_SESSION['user_id']]);
         $perms = $st->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        if (!$perms) {
+            $defaults = default_role_permissions();
+            return array_values($defaults[$role] ?? $defaults['staff'] ?? []);
+        }
         return array_values(array_unique(array_map('strval', $perms)));
     }
 }

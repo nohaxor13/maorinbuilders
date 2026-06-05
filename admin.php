@@ -226,7 +226,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
       }
       $pdo->commit();
-      $flashSuccess = 'Role created.';
+      admin_set_flash_and_redirect('success', 'Role created.', '#tab-roles');
     } elseif ($action === 'update_role') {
       $slug = trim((string)($_POST['slug'] ?? ''));
       $name = trim((string)($_POST['name'] ?? ''));
@@ -252,7 +252,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
       }
       $pdo->commit();
-      $flashSuccess = 'Role updated.';
+      admin_set_flash_and_redirect('success', 'Role updated.', '#tab-roles');
     } elseif ($action === 'delete_role') {
       $slug = trim((string)($_POST['slug'] ?? ''));
       if (in_array($slug, ['admin', 'staff', 'accounting', 'warehouse'], true)) {
@@ -263,7 +263,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $pdo->prepare("DELETE FROM roles WHERE slug = ?")->execute([$slug]);
       $pdo->prepare("UPDATE user_roles SET role = 'staff' WHERE role = ?")->execute([$slug]);
       $pdo->commit();
-      $flashSuccess = 'Role deleted.';
+      admin_set_flash_and_redirect('success', 'Role deleted.', '#tab-roles');
     } elseif ($action === 'create_staff') {
       $name = trim((string)($_POST['name'] ?? ''));
       $email = strtolower(trim((string)($_POST['email'] ?? '')));
