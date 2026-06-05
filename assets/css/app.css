@@ -1,3 +1,7 @@
 /* assets/css/app.css - internal app UI tweaks */
 body{background:#f8f9fa}
 .card{margin-bottom:1rem}
+
+/* Workspace SPA integrated with existing Maorin Builders UI */
+.workspace-shell-card{border-radius:1.25rem;overflow:hidden}.workspace-tabs .nav-link{border-radius:999px;color:#334155;font-weight:600}.workspace-tabs .nav-link.active{background:#0d6efd;color:#fff}.workspace-toolbar .form-control{min-width:220px}.workspace-content-area{min-height:420px}.workspace-stat{border:1px solid #e9ecef;background:#f8f9fa;border-radius:1rem;padding:1rem;height:100%}.workspace-table-wrap{border:1px solid #e9ecef;border-radius:1rem;overflow:auto}.workspace-table{margin:0}.workspace-table th{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:#6c757d;background:#f8f9fa;white-space:nowrap}.workspace-table td{white-space:nowrap}.workspace-spa .modal-content{border:0;border-radius:1rem;box-shadow:0 1rem 3rem rgba(15,23,42,.18)}
+@media (max-width: 768px){.workspace-toolbar{width:100%}.workspace-toolbar .form-control{min-width:0;flex:1}.workspace-tabs{gap:.25rem}.workspace-tabs .nav-link{padding:.45rem .7rem}}

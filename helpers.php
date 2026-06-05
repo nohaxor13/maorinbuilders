@@ -144,35 +144,66 @@ if (!function_exists('permission_catalog')) {
             'manage_company_content' => 'Manage Company Content',
             'manage_client_portal' => 'Manage Client Portal',
             'run_database_tools' => 'Run Database Tools',
+            'view_projects' => 'View Projects',
+            'manage_projects' => 'Manage Projects',
+            'view_estimates' => 'View Estimates',
+            'manage_estimates' => 'Manage Estimates',
+            'view_proposals' => 'View Proposals',
+            'manage_proposals' => 'Manage Proposals',
+            'view_plans' => 'View Floor and Architectural Plans',
+            'manage_plans' => 'Manage Floor and Architectural Plans',
+            'view_finance' => 'View Finance Workspace',
+            'manage_expenses' => 'Manage Expenses',
+            'manage_taxes' => 'Manage Taxes',
+            'manage_ledgers' => 'Manage Ledgers',
+            'manage_bills' => 'Manage Bills',
+            'manage_invoices' => 'Manage Invoices',
+            'manage_receipts' => 'Manage Receipts',
+            'manage_permits' => 'Manage Permits and Fees',
+            'view_hr' => 'View HR Workspace',
+            'manage_employees' => 'Manage Employees',
+            'manage_attendance' => 'Manage Attendance',
+            'manage_payroll' => 'Manage Payroll and Salary',
+            'manage_insurance' => 'Manage Insurance',
+            'view_inventory' => 'View Inventory',
+            'manage_inventory' => 'Manage Inventory',
+            'view_documents' => 'View Documents',
+            'manage_documents' => 'Manage Documents',
+            'view_reports' => 'View Reports',
+            'manage_tasks' => 'Manage Tasks',
         ];
     }
 }
 
 if (!function_exists('default_role_permissions')) {
     function default_role_permissions(): array {
+        $all = array_keys(permission_catalog());
         return [
-            'admin' => array_keys(permission_catalog()),
+            'admin' => $all,
+            'engineer_owner' => [
+                'view_account_dashboard','view_projects','manage_projects','view_estimates','manage_estimates',
+                'view_proposals','manage_proposals','view_plans','manage_plans','view_finance','view_inventory',
+                'view_documents','manage_documents','view_reports','view_inquiries','manage_client_portal','manage_tasks'
+            ],
+            'assistant' => [
+                'view_account_dashboard','view_journal','create_journal','edit_journal','export_journal','import_journal',
+                'view_projects','manage_projects','view_estimates','manage_estimates','view_proposals','manage_proposals',
+                'view_finance','manage_expenses','manage_taxes','manage_ledgers','manage_bills','manage_invoices','manage_receipts','manage_permits',
+                'view_hr','manage_employees','manage_attendance','manage_payroll','manage_insurance',
+                'view_documents','manage_documents','view_reports','view_inquiries','manage_client_portal','manage_tasks'
+            ],
+            'encoder' => [
+                'view_account_dashboard','view_journal','create_journal','edit_journal','export_journal','import_journal',
+                'view_finance','manage_expenses','manage_ledgers','view_reports'
+            ],
             'staff' => [
-                'view_account_dashboard',
-                'view_journal',
-                'create_journal',
-                'edit_journal',
-                'view_inquiries',
+                'view_account_dashboard','view_projects','view_inventory','manage_inventory','view_documents','manage_documents','view_reports','view_inquiries','manage_tasks'
             ],
             'accounting' => [
-                'view_account_dashboard',
-                'view_journal',
-                'create_journal',
-                'edit_journal',
-                'delete_journal',
-                'export_journal',
-                'import_journal',
-                'view_inquiries',
+                'view_account_dashboard','view_journal','create_journal','edit_journal','delete_journal','export_journal','import_journal','view_finance','manage_expenses','manage_ledgers','view_reports','view_inquiries'
             ],
             'warehouse' => [
-                'view_account_dashboard',
-                'view_journal',
-                'create_journal',
+                'view_account_dashboard','view_journal','create_journal','view_inventory','manage_inventory','view_projects'
             ],
         ];
     }
@@ -201,9 +232,12 @@ if (!function_exists('ensure_roles_permissions_tables')) {
 
         $defaults = [
             ['admin', 'Administrator', 1],
+            ['engineer_owner', 'Engineer / Owner', 1],
+            ['assistant', 'Assistant', 1],
+            ['encoder', 'Encoder', 1],
             ['staff', 'Staff', 1],
-            ['accounting', 'Accounting', 1],
-            ['warehouse', 'Warehouse', 1],
+            ['accounting', 'Accounting (Legacy)', 1],
+            ['warehouse', 'Warehouse (Legacy)', 1],
         ];
         $stmt = $pdo->prepare("INSERT IGNORE INTO roles (slug, name, is_system) VALUES (?, ?, ?)");
         foreach ($defaults as [$slug, $name, $isSystem]) {
@@ -518,4 +552,220 @@ if (!function_exists('client_can_access_project')) {
     }
 }
 
-?>
+/* --------------------------------------------------------------------------
+ * Maorin Builders full workspace upgrade helpers
+ * -------------------------------------------------------------------------- */
+if (!function_exists('mb_base_url')) {
+    function mb_base_url(string $path = ''): string {
+        $script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+        $base = preg_replace('#/(modules|client|public)(/.*)?$#', '', dirname($script));
+        if ($base === '/' || $base === '\\' || $base === '.') { $base = ''; }
+        $path = ltrim($path, '/');
+        return rtrim($base, '/') . ($path !== '' ? '/' . $path : '');
+    }
+}
+
+if (!function_exists('mb_money')) {
+    function mb_money($amount): string { return number_format((float)$amount, 2); }
+}
+
+if (!function_exists('mb_require_any_permission')) {
+    function mb_require_any_permission(PDO $pdo, array $permissions): void {
+        foreach ($permissions as $permission) {
+            if (current_user_can($pdo, $permission)) { return; }
+        }
+        http_response_code(403);
+        echo 'Forbidden';
+        exit;
+    }
+}
+
+if (!function_exists('ensure_maorin_workspace_tables')) {
+    function ensure_maorin_workspace_tables(PDO $pdo): void {
+        ensure_roles_permissions_tables($pdo);
+        $pdo->exec("CREATE TABLE IF NOT EXISTS mb_projects (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            project_code VARCHAR(64) NULL UNIQUE,
+            name VARCHAR(180) NOT NULL,
+            client_name VARCHAR(180) NULL,
+            client_email VARCHAR(180) NULL,
+            client_phone VARCHAR(64) NULL,
+            location VARCHAR(255) NULL,
+            project_type VARCHAR(80) NULL,
+            status VARCHAR(32) NOT NULL DEFAULT 'proposed',
+            progress_percent TINYINT UNSIGNED NOT NULL DEFAULT 0,
+            start_date DATE NULL,
+            target_end_date DATE NULL,
+            estimated_cost DECIMAL(14,2) NOT NULL DEFAULT 0,
+            actual_cost DECIMAL(14,2) NOT NULL DEFAULT 0,
+            contract_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+            notes TEXT NULL,
+            created_by INT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_mb_projects_status (status),
+            INDEX idx_mb_projects_client (client_name)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS mb_project_updates (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            project_id INT NOT NULL,
+            update_date DATE NOT NULL,
+            title VARCHAR(180) NOT NULL,
+            progress_percent TINYINT UNSIGNED NULL,
+            cost_added DECIMAL(14,2) NOT NULL DEFAULT 0,
+            details TEXT NULL,
+            created_by INT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_mb_project_updates_project (project_id, update_date),
+            FOREIGN KEY (project_id) REFERENCES mb_projects(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS mb_estimates (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            project_id INT NULL,
+            estimate_no VARCHAR(64) NULL UNIQUE,
+            title VARCHAR(180) NOT NULL,
+            client_name VARCHAR(180) NULL,
+            status VARCHAR(32) NOT NULL DEFAULT 'draft',
+            labor_cost DECIMAL(14,2) NOT NULL DEFAULT 0,
+            material_cost DECIMAL(14,2) NOT NULL DEFAULT 0,
+            equipment_cost DECIMAL(14,2) NOT NULL DEFAULT 0,
+            overhead_cost DECIMAL(14,2) NOT NULL DEFAULT 0,
+            markup_percent DECIMAL(8,2) NOT NULL DEFAULT 0,
+            tax_percent DECIMAL(8,2) NOT NULL DEFAULT 0,
+            subtotal DECIMAL(14,2) NOT NULL DEFAULT 0,
+            markup_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+            tax_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+            grand_total DECIMAL(14,2) NOT NULL DEFAULT 0,
+            notes TEXT NULL,
+            created_by INT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_mb_estimates_project (project_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS mb_proposals (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            project_id INT NULL,
+            estimate_id INT NULL,
+            proposal_no VARCHAR(64) NULL UNIQUE,
+            title VARCHAR(180) NOT NULL,
+            client_name VARCHAR(180) NULL,
+            status VARCHAR(32) NOT NULL DEFAULT 'draft',
+            amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+            valid_until DATE NULL,
+            scope TEXT NULL,
+            terms TEXT NULL,
+            created_by INT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_mb_proposals_project (project_id),
+            INDEX idx_mb_proposals_estimate (estimate_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS mb_plan_files (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            project_id INT NULL,
+            title VARCHAR(180) NOT NULL,
+            plan_type VARCHAR(80) NOT NULL DEFAULT 'floor_plan',
+            revision VARCHAR(40) NULL,
+            status VARCHAR(32) NOT NULL DEFAULT 'draft',
+            file_path VARCHAR(255) NULL,
+            notes TEXT NULL,
+            created_by INT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_mb_plan_files_project (project_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS mb_expenses (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            project_id INT NULL,
+            expense_date DATE NOT NULL,
+            category VARCHAR(120) NULL,
+            vendor VARCHAR(180) NULL,
+            description TEXT NULL,
+            amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+            tax_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+            reference_no VARCHAR(120) NULL,
+            status VARCHAR(32) NOT NULL DEFAULT 'recorded',
+            created_by INT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_mb_expenses_project (project_id),
+            INDEX idx_mb_expenses_date (expense_date)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS mb_invoices (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            project_id INT NULL,
+            invoice_no VARCHAR(80) NULL UNIQUE,
+            client_name VARCHAR(180) NULL,
+            issue_date DATE NOT NULL,
+            due_date DATE NULL,
+            amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+            paid_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+            status VARCHAR(32) NOT NULL DEFAULT 'unpaid',
+            notes TEXT NULL,
+            created_by INT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS mb_employees (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            employee_code VARCHAR(64) NULL UNIQUE,
+            full_name VARCHAR(180) NOT NULL,
+            employee_type VARCHAR(80) NULL,
+            job_title VARCHAR(120) NULL,
+            department VARCHAR(120) NULL,
+            phone VARCHAR(64) NULL,
+            email VARCHAR(180) NULL,
+            daily_rate DECIMAL(12,2) NOT NULL DEFAULT 0,
+            status VARCHAR(32) NOT NULL DEFAULT 'active',
+            notes TEXT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS mb_attendance (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            employee_id INT NOT NULL,
+            project_id INT NULL,
+            attendance_date DATE NOT NULL,
+            time_in TIME NULL,
+            time_out TIME NULL,
+            status VARCHAR(32) NOT NULL DEFAULT 'present',
+            notes TEXT NULL,
+            created_by INT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_mb_attendance_day (employee_id, attendance_date),
+            FOREIGN KEY (employee_id) REFERENCES mb_employees(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS mb_inventory_items (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            sku VARCHAR(80) NULL UNIQUE,
+            item_name VARCHAR(180) NOT NULL,
+            category VARCHAR(120) NULL,
+            unit VARCHAR(40) NULL,
+            quantity DECIMAL(14,2) NOT NULL DEFAULT 0,
+            min_quantity DECIMAL(14,2) NOT NULL DEFAULT 0,
+            unit_cost DECIMAL(14,2) NOT NULL DEFAULT 0,
+            location VARCHAR(180) NULL,
+            status VARCHAR(32) NOT NULL DEFAULT 'active',
+            notes TEXT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS mb_documents (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            project_id INT NULL,
+            related_type VARCHAR(80) NULL,
+            related_id INT NULL,
+            title VARCHAR(180) NOT NULL,
+            category VARCHAR(120) NULL,
+            status VARCHAR(32) NOT NULL DEFAULT 'active',
+            file_path VARCHAR(255) NULL,
+            expiry_date DATE NULL,
+            notes TEXT NULL,
+            created_by INT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_mb_documents_project (project_id),
+            INDEX idx_mb_documents_category (category)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+}
