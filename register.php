@@ -32,7 +32,7 @@ include "templates/header.php";
     </div>
     <div class="col-md-6">
       <label class="form-label">Email</label>
-      <input type="email" name="email" class="form-control" required>
+      <input type="text" name="email" class="form-control" required>
     </div>
     <div class="col-md-6">
       <label class="form-label">Password</label>

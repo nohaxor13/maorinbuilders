@@ -278,7 +278,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($name === '' || $email === '' || $password === '') {
         throw new RuntimeException('Name, email, and password are required.');
       }
-      if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+      if (!is_valid_email_address($email)) {
         throw new RuntimeException('Please enter a valid email address.');
       }
       $allowedRoleStmt = $pdo->prepare("SELECT COUNT(*) FROM roles WHERE slug = ?");
@@ -363,7 +363,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($userId <= 0 || $name === '' || $email === '') {
         throw new RuntimeException('Staff name and email are required.');
       }
-      if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+      if (!is_valid_email_address($email)) {
         throw new RuntimeException('Please enter a valid email address.');
       }
       $allowedRoleStmt = $pdo->prepare("SELECT COUNT(*) FROM roles WHERE slug = ?");
@@ -1120,7 +1120,7 @@ include __DIR__ . '/templates/header.php';
             <input type="hidden" name="action" value="create_staff">
             <div class="row g-3">
               <div class="col-md-6"><label class="form-label">Name</label><input type="text" name="name" class="form-control" required></div>
-              <div class="col-md-6"><label class="form-label">Email</label><input type="email" name="email" class="form-control" required></div>
+              <div class="col-md-6"><label class="form-label">Email</label><input type="text" name="email" class="form-control" required></div>
               <div class="col-md-6"><label class="form-label">Password</label><input type="password" name="password" class="form-control" autocomplete="new-password" required></div>
               <div class="col-md-6">
                 <label class="form-label">Role</label>
@@ -1164,7 +1164,7 @@ include __DIR__ . '/templates/header.php';
             <input type="hidden" name="user_id" id="edit_user_id" value="">
             <div class="row g-3">
               <div class="col-md-6"><label class="form-label">Name</label><input type="text" name="name" id="edit_name" class="form-control" required></div>
-              <div class="col-md-6"><label class="form-label">Email</label><input type="email" name="email" id="edit_email" class="form-control" required></div>
+              <div class="col-md-6"><label class="form-label">Email</label><input type="text" name="email" id="edit_email" class="form-control" required></div>
               <div class="col-md-6">
                 <label class="form-label">Role</label>
                 <select name="role" id="edit_role" class="form-select">
