@@ -41,7 +41,7 @@ main.container, .content.container {
 /* TABLE is the ONLY scroll area */
 .table-wrap{
   flex:1 1 auto; overflow-y:auto; overflow-x:hidden;
-  padding-bottom: .35rem;             /* keeps sticky footer clear of the viewport edge */
+  padding-bottom: 4.5rem;             /* keeps the sticky totals row above the bottom bar */
 }
 
 /* Table visuals + sticky head/foot inside the scroller */
@@ -112,6 +112,11 @@ td.col-desc > .desc-box{
   border-top:1px solid var(--bs-border-color);
   padding:.4rem .75rem;
   display:flex; align-items:center; justify-content:space-between; gap:.5rem;
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  background: #fff;
+  box-shadow: 0 -2px 8px rgba(0,0,0,.06);
 }
 </style>
 
@@ -209,15 +214,17 @@ td.col-desc > .desc-box{
   <div class="page-controls">
     <div class="small text-muted">Tip: use Presets for quick date filters.</div>
     <div class="d-flex align-items-center gap-2">
-      <div class="input-group input-group-sm" style="width: 170px;">
+      <div class="input-group input-group-sm" style="width: 190px;">
         <span class="input-group-text">Rows</span>
         <!-- ✅ ALL is default (value=0) -->
         <select id="pageSize" class="form-select">
           <option value="0" selected>All</option>
+          <option value="10">10</option>
+          <option value="25">25</option>
           <option value="50">50</option>
           <option value="100">100</option>
-          <option value="150">150</option>
-          <option value="200">200</option>
+          <option value="500">500</option>
+          <option value="1000">1000</option>
         </select>
       </div>
       <button class="btn btn-sm btn-outline-secondary" id="prevPage">Prev</button>

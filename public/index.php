@@ -2,21 +2,17 @@
 // =====================================================
 // Maorin Builders Public Home
 // Works if this file is placed in:
-//   ✅ /public/index.php
-//   ✅ /index.php  (accidentally placed at root)
+//   /public/index.php
+//   /index.php  (accidentally placed at root)
 // =====================================================
 
-$title = 'Maorin Builders — Construction • Renovation • Design & Build';
+$title = 'Maorin Builders - Construction • Renovation • Design & Build';
 
-// Detect base directory (public folder vs root)
 $here = __DIR__;
 $inPublic = is_dir($here . '/templates') && is_file($here . '/templates/header.php');
-
-// If file is in /public
 $tplDir  = $inPublic ? ($here . '/templates') : ($here . '/public/templates');
-$dataDir = $inPublic ? ($here . '/data')      : ($here . '/public/data');
+$dataDir = $inPublic ? ($here . '/data') : ($here . '/public/data');
 
-// Hard fail with clear error (instead of blank page)
 if (!is_file($tplDir . '/header.php')) {
   http_response_code(500);
   die("Missing template: " . htmlspecialchars($tplDir . "/header.php"));
@@ -32,8 +28,31 @@ if (!is_file($dataDir . '/projects.php')) {
 
 require $tplDir . '/header.php';
 
-$projects = require $dataDir . '/projects.php';
-if (!is_array($projects)) $projects = [];
+if (!function_exists('project_media_url')) {
+  function project_media_url(?string $path, string $fallback = ''): string {
+    $path = trim((string)$path);
+    if ($path === '') {
+      return $fallback;
+    }
+    return pub_url('/' . ltrim($path, '/'));
+  }
+}
+
+ensure_content_catalog_tables($pdo);
+$projects = [];
+try {
+  $st = $pdo->query("SELECT slug AS id, title, location, year, type, status, cover, summary FROM website_projects ORDER BY id DESC");
+  $projects = $st ? ($st->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+} catch (Throwable $e) {
+  $projects = [];
+}
+
+if (!$projects) {
+  $projects = require $dataDir . '/projects.php';
+  if (!is_array($projects)) {
+    $projects = [];
+  }
+}
 ?>
 
 <header class="mb-hero py-5">
@@ -117,22 +136,25 @@ if (!is_array($projects)) $projects = [];
     <div class="row g-4">
       <?php foreach (array_slice($projects, 0, 3) as $p): ?>
         <?php
-          $pid = $p['id'] ?? '';
-          $cover = $p['cover'] ?? '';
-          $ptitle = $p['title'] ?? 'Project';
-          $ptype = $p['type'] ?? '';
-          $ploc = $p['location'] ?? '';
-          $pyear = $p['year'] ?? '';
-          $psum = $p['summary'] ?? '';
+          $pid = (string)($p['id'] ?? '');
+          $cover = (string)($p['cover'] ?? '');
+          $ptitle = (string)($p['title'] ?? 'Project');
+          $ptype = (string)($p['type'] ?? '');
+          $ploc = (string)($p['location'] ?? '');
+          $pyear = (string)($p['year'] ?? '');
+          $psum = (string)($p['summary'] ?? '');
+          $coverUrl = project_media_url($cover, pub_url('/assets/img/projects/residence.svg'));
         ?>
         <div class="col-md-4">
-          <a class="text-decoration-none" href="<?= htmlspecialchars(pub_url('/public/project_view.php'), ENT_QUOTES, 'UTF-8') ?>?id=<?= urlencode((string)$pid) ?>">
+          <a class="text-decoration-none" href="<?= htmlspecialchars(pub_url('/public/project_view.php'), ENT_QUOTES, 'UTF-8') ?>?id=<?= urlencode($pid) ?>">
             <div class="card border-0 shadow-sm rounded-4 h-100">
-              <img class="mb-portfolio-img" src="<?= htmlspecialchars($cover, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($ptitle, ENT_QUOTES, 'UTF-8') ?>">
+              <img class="mb-portfolio-img" src="<?= htmlspecialchars($coverUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($ptitle, ENT_QUOTES, 'UTF-8') ?>" onerror="this.onerror=null;this.src='<?= htmlspecialchars(pub_url('/assets/img/projects/residence.svg'), ENT_QUOTES, 'UTF-8') ?>';">
               <div class="card-body p-4">
-                <div class="small mb-muted"><?= htmlspecialchars($ptype) ?> • <?= htmlspecialchars($ploc) ?> • <?= htmlspecialchars($pyear) ?></div>
-                <div class="h5 mb-2 text-dark"><?= htmlspecialchars($ptitle) ?></div>
-                <div class="mb-muted"><?= htmlspecialchars($psum) ?></div>
+                <div class="small mb-muted">
+                  <?= htmlspecialchars($ptype, ENT_QUOTES, 'UTF-8') ?> • <?= htmlspecialchars($ploc, ENT_QUOTES, 'UTF-8') ?> • <?= htmlspecialchars($pyear, ENT_QUOTES, 'UTF-8') ?>
+                </div>
+                <div class="h5 mb-2 text-dark"><?= htmlspecialchars($ptitle, ENT_QUOTES, 'UTF-8') ?></div>
+                <div class="mb-muted"><?= htmlspecialchars($psum, ENT_QUOTES, 'UTF-8') ?></div>
               </div>
             </div>
           </a>
@@ -144,7 +166,7 @@ if (!is_array($projects)) $projects = [];
       <div class="row align-items-center g-3">
         <div class="col-lg-8">
           <div class="h4 fw-bold mb-1">Have a project in mind?</div>
-          <div class="mb-muted">Tell us your scope and location — we’ll get back with next steps and a quotation schedule.</div>
+          <div class="mb-muted">Tell us your scope and location - we’ll get back with next steps and a quotation schedule.</div>
         </div>
         <div class="col-lg-4 text-lg-end">
           <a class="btn btn-primary btn-lg" href="<?= htmlspecialchars(pub_url('/public/contact.php'), ENT_QUOTES, 'UTF-8') ?>">Get a Quote</a>

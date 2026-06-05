@@ -58,6 +58,6 @@ return [
     'messenger_username' => 'YourPageUsername',
 
     // Google Maps embed URL (replace with your pinned location)
-    'map_embed_url' => 'https://maps.google.com/maps?q=Manila%20Philippines&t=&z=12&ie=UTF8&iwloc=&output=embed',
+    'map_embed_url' => 'https://www.google.com/maps?q=7.140785406644884,125.65552576134661&z=18&t=k&output=embed',
   ],
 ];

@@ -712,6 +712,7 @@ include __DIR__ . '/templates/header.php';
               <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#maintenanceModal">Edit maintenance</button>
               <a class="btn btn-outline-secondary" href="journal_export.php">Journal export</a>
               <a class="btn btn-outline-secondary" href="journal_import.php">Journal import</a>
+              <a class="btn btn-outline-secondary" href="admin_about.php">Edit About page</a>
               <a class="btn btn-outline-secondary" href="testimonials_admin.php">Testimonials</a>
               <a class="btn btn-outline-secondary" href="project_updates_admin.php">Project updates</a>
               <a class="btn btn-outline-secondary" href="client_portal_admin.php">Client portal</a>

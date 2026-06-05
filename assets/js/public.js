@@ -21,6 +21,7 @@
 
     // Support click-to-set on the container
     root.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('[data-full-image]')) return;
       // avoid dragging the range itself twice
       if (e.target === range) return;
       const rect = root.getBoundingClientRect();

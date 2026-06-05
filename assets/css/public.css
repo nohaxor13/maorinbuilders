@@ -144,7 +144,20 @@ body{color:var(--mb-ink);background:var(--mb-bg)}
   position:absolute; top:12px; padding:6px 10px;
   font-size:12px; border-radius:999px;
   background:rgba(15,23,42,.72); color:#fff;
-  backdrop-filter: blur(3px)
+  backdrop-filter: blur(3px);
+  z-index: 3;
+}
+.mb-beforeafter .ba-label{
+  border:0;
+  cursor:pointer;
+}
+.mb-beforeafter .ba-label:focus{
+  outline:2px solid rgba(228,206,25,.75);
+  outline-offset:2px;
 }
 .mb-beforeafter .ba-label-before{left:12px}
 .mb-beforeafter .ba-label-after{right:12px}
+.mb-beforeafter .ba-range{z-index: 2;}
+.mb-beforeafter .ba-before-wrap,
+.mb-beforeafter .ba-after,
+.mb-beforeafter .ba-line{z-index: 1;}
