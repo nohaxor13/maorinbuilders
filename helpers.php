@@ -110,6 +110,23 @@ if (!function_exists('ensure_table_user_roles')) {
     }
 }
 
+if (!function_exists('is_valid_email_address')) {
+    function is_valid_email_address(string $email): bool {
+        $email = trim($email);
+        if ($email === '' || str_contains($email, ' ') || !str_contains($email, '@')) {
+            return false;
+        }
+        [$localPart, $domainPart] = array_pad(explode('@', $email, 2), 2, '');
+        if ($localPart === '' || $domainPart === '') {
+            return false;
+        }
+        if (function_exists('filter_var') && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return true;
+        }
+        return (bool)preg_match('/^[^@\s]+@[^@\s]+$/', $email);
+    }
+}
+
 if (!function_exists('permission_catalog')) {
     function permission_catalog(): array {
         return [
