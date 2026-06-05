@@ -8,6 +8,7 @@ require_admin($pdo);
 
 ensure_site_settings_table($pdo);
 ensure_table_user_roles($pdo);
+ensure_roles_permissions_tables($pdo);
 ensure_staff_profiles_table($pdo);
 ensure_staff_activity_log_table($pdo);
 ensure_content_catalog_tables($pdo);
@@ -202,6 +203,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
       $maintenanceSaved = true;
       $flashSuccess = 'Maintenance settings updated.';
+    } elseif ($action === 'create_role') {
+      $slug = strtolower(trim((string)($_POST['slug'] ?? '')));
+      $name = trim((string)($_POST['name'] ?? ''));
+      $permissions = array_values(array_filter(array_map('trim', (array)($_POST['permissions'] ?? []))));
+      if ($slug === '' || $name === '') {
+        throw new RuntimeException('Role slug and name are required.');
+      }
+      if (!preg_match('/^[a-z0-9_-]+$/', $slug)) {
+        throw new RuntimeException('Role slug may only contain letters, numbers, dashes, and underscores.');
+      }
+      if (in_array($slug, ['admin', 'staff', 'accounting', 'warehouse'], true)) {
+        throw new RuntimeException('Use a unique slug for custom roles.');
+      }
+      $pdo->beginTransaction();
+      $st = $pdo->prepare("INSERT INTO roles (slug, name, is_system) VALUES (?, ?, 0)");
+      $st->execute([$slug, $name]);
+      $permStmt = $pdo->prepare("INSERT IGNORE INTO role_permissions (role_slug, permission_key) VALUES (?, ?)");
+      foreach ($permissions as $permission) {
+        if (array_key_exists($permission, permission_catalog())) {
+          $permStmt->execute([$slug, $permission]);
+        }
+      }
+      $pdo->commit();
+      $flashSuccess = 'Role created.';
+    } elseif ($action === 'update_role') {
+      $slug = trim((string)($_POST['slug'] ?? ''));
+      $name = trim((string)($_POST['name'] ?? ''));
+      $permissions = array_values(array_filter(array_map('trim', (array)($_POST['permissions'] ?? []))));
+      if ($slug === '' || $name === '') {
+        throw new RuntimeException('Role slug and name are required.');
+      }
+      $roleStmt = $pdo->prepare("SELECT is_system FROM roles WHERE slug = ? LIMIT 1");
+      $roleStmt->execute([$slug]);
+      $isSystem = (int)$roleStmt->fetchColumn();
+      if ($isSystem && in_array($slug, ['admin', 'staff', 'accounting', 'warehouse'], true) === false) {
+        throw new RuntimeException('This role cannot be edited.');
+      }
+      $pdo->beginTransaction();
+      $st = $pdo->prepare("UPDATE roles SET name = ? WHERE slug = ?");
+      $st->execute([$name, $slug]);
+      $del = $pdo->prepare("DELETE FROM role_permissions WHERE role_slug = ?");
+      $del->execute([$slug]);
+      $permStmt = $pdo->prepare("INSERT INTO role_permissions (role_slug, permission_key) VALUES (?, ?)");
+      foreach ($permissions as $permission) {
+        if (array_key_exists($permission, permission_catalog())) {
+          $permStmt->execute([$slug, $permission]);
+        }
+      }
+      $pdo->commit();
+      $flashSuccess = 'Role updated.';
+    } elseif ($action === 'delete_role') {
+      $slug = trim((string)($_POST['slug'] ?? ''));
+      if (in_array($slug, ['admin', 'staff', 'accounting', 'warehouse'], true)) {
+        throw new RuntimeException('Core roles cannot be deleted.');
+      }
+      $pdo->beginTransaction();
+      $pdo->prepare("DELETE FROM role_permissions WHERE role_slug = ?")->execute([$slug]);
+      $pdo->prepare("DELETE FROM roles WHERE slug = ?")->execute([$slug]);
+      $pdo->prepare("UPDATE user_roles SET role = 'staff' WHERE role = ?")->execute([$slug]);
+      $pdo->commit();
+      $flashSuccess = 'Role deleted.';
     } elseif ($action === 'create_staff') {
       $name = trim((string)($_POST['name'] ?? ''));
       $email = strtolower(trim((string)($_POST['email'] ?? '')));
@@ -219,7 +281,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         throw new RuntimeException('Please enter a valid email address.');
       }
-      if (!in_array($role, ['admin', 'staff', 'accounting', 'warehouse'], true)) {
+      $allowedRoleStmt = $pdo->prepare("SELECT COUNT(*) FROM roles WHERE slug = ?");
+      $allowedRoleStmt->execute([$role]);
+      if ((int)$allowedRoleStmt->fetchColumn() === 0) {
         $role = 'staff';
       }
 
@@ -254,7 +318,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($userId <= 0) {
         throw new RuntimeException('Invalid staff member.');
       }
-      if (!in_array($role, ['admin', 'staff', 'accounting', 'warehouse'], true)) {
+      $allowedRoleStmt = $pdo->prepare("SELECT COUNT(*) FROM roles WHERE slug = ?");
+      $allowedRoleStmt->execute([$role]);
+      if ((int)$allowedRoleStmt->fetchColumn() === 0) {
         throw new RuntimeException('Invalid role selected.');
       }
       $stmt = $pdo->prepare("INSERT INTO user_roles (user_id, role) VALUES (?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role)");
@@ -300,7 +366,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         throw new RuntimeException('Please enter a valid email address.');
       }
-      if (!in_array($role, ['admin', 'staff', 'accounting', 'warehouse'], true)) {
+      $allowedRoleStmt = $pdo->prepare("SELECT COUNT(*) FROM roles WHERE slug = ?");
+      $allowedRoleStmt->execute([$role]);
+      if ((int)$allowedRoleStmt->fetchColumn() === 0) {
         throw new RuntimeException('Invalid role selected.');
       }
       $pdo->beginTransaction();
@@ -613,6 +681,14 @@ $projectMediaRows = $pdo->query(
    LIMIT 24"
 )->fetchAll(PDO::FETCH_ASSOC);
 
+$permissionCatalog = permission_catalog();
+$roles = $pdo->query("SELECT slug, name, is_system, created_at, updated_at FROM roles ORDER BY is_system DESC, name ASC")->fetchAll(PDO::FETCH_ASSOC);
+$rolePermissions = [];
+$rolePermRows = $pdo->query("SELECT role_slug, permission_key FROM role_permissions")->fetchAll(PDO::FETCH_ASSOC);
+foreach ($rolePermRows as $row) {
+  $rolePermissions[(string)$row['role_slug']][] = (string)$row['permission_key'];
+}
+
 $title = 'Admin Dashboard';
 include __DIR__ . '/templates/header.php';
 ?>
@@ -696,6 +772,7 @@ include __DIR__ . '/templates/header.php';
 
   <ul class="nav nav-pills gap-2 admin-tabs mb-3" id="adminTabs" role="tablist">
     <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-overview" type="button" role="tab">Overview</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-roles" type="button" role="tab">Roles</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-staff" type="button" role="tab">Staff</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-activity" type="button" role="tab">Activity</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-maintenance" type="button" role="tab">Maintenance</button></li>
@@ -814,6 +891,100 @@ include __DIR__ . '/templates/header.php';
                   <?php endif; ?>
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade" id="tab-roles" role="tabpanel">
+      <div class="row g-3">
+        <div class="col-lg-5">
+          <div class="card admin-card h-100">
+            <div class="card-header bg-white fw-semibold">Create role</div>
+            <div class="card-body">
+              <form method="post" class="row g-3">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="action" value="create_role">
+                <div class="col-12">
+                  <label class="form-label">Role slug</label>
+                  <input type="text" name="slug" class="form-control" placeholder="supervisor" required>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Role name</label>
+                  <input type="text" name="name" class="form-control" placeholder="Supervisor" required>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Permissions</label>
+                  <div class="border rounded-3 p-3" style="max-height: 340px; overflow:auto;">
+                    <div class="row g-2">
+                      <?php foreach ($permissionCatalog as $key => $label): ?>
+                        <div class="col-12">
+                          <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="permissions[]" value="<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>" id="create_perm_<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>">
+                            <label class="form-check-label" for="create_perm_<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?></label>
+                          </div>
+                        </div>
+                      <?php endforeach; ?>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-12">
+                  <button class="btn btn-primary">Create role</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-7">
+          <div class="card admin-card">
+            <div class="card-header bg-white fw-semibold">Existing roles</div>
+            <div class="card-body">
+              <?php foreach ($roles as $roleRow): ?>
+                <?php $roleSlug = (string)$roleRow['slug']; $selectedPermissions = $rolePermissions[$roleSlug] ?? []; ?>
+                <div class="border rounded-3 p-3 mb-3 bg-light">
+                  <form method="post" class="row g-3">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="action" value="update_role">
+                    <input type="hidden" name="slug" value="<?= htmlspecialchars($roleSlug, ENT_QUOTES, 'UTF-8') ?>">
+                    <div class="col-md-4">
+                      <label class="form-label">Slug</label>
+                      <input type="text" class="form-control" value="<?= htmlspecialchars($roleSlug, ENT_QUOTES, 'UTF-8') ?>" readonly>
+                    </div>
+                    <div class="col-md-8">
+                      <label class="form-label">Name</label>
+                      <input type="text" name="name" class="form-control" value="<?= htmlspecialchars((string)$roleRow['name'], ENT_QUOTES, 'UTF-8') ?>" <?= $roleRow['is_system'] ? 'readonly' : '' ?>>
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label">Permissions</label>
+                      <div class="row g-2">
+                        <?php foreach ($permissionCatalog as $key => $label): ?>
+                          <div class="col-md-6">
+                            <div class="form-check">
+                              <input class="form-check-input" type="checkbox" name="permissions[]" value="<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>" id="perm_<?= htmlspecialchars($roleSlug . '_' . $key, ENT_QUOTES, 'UTF-8') ?>" <?= in_array($key, $selectedPermissions, true) ? 'checked' : '' ?> <?= $roleSlug === 'admin' ? 'checked disabled' : '' ?>>
+                              <label class="form-check-label" for="perm_<?= htmlspecialchars($roleSlug . '_' . $key, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?></label>
+                            </div>
+                          </div>
+                        <?php endforeach; ?>
+                      </div>
+                      <?php if ($roleSlug === 'admin'): ?>
+                        <div class="form-text">Admin always has all permissions.</div>
+                      <?php endif; ?>
+                    </div>
+                    <div class="col-12">
+                      <button class="btn btn-primary" <?= ($roleSlug === 'admin') ? 'disabled' : '' ?>>Save role</button>
+                    </div>
+                  </form>
+                  <?php if (!$roleRow['is_system']): ?>
+                    <form method="post" class="mt-2" onsubmit="return confirm('Delete this role? Users with it will be moved to staff.')">
+                      <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
+                      <input type="hidden" name="action" value="delete_role">
+                      <input type="hidden" name="slug" value="<?= htmlspecialchars($roleSlug, ENT_QUOTES, 'UTF-8') ?>">
+                      <button class="btn btn-outline-danger btn-sm" type="submit">Delete role</button>
+                    </form>
+                  <?php endif; ?>
+                </div>
+              <?php endforeach; ?>
             </div>
           </div>
         </div>

@@ -5,7 +5,7 @@ declare(strict_types=1);
 require __DIR__ . '/config.php';
 require __DIR__ . '/helpers.php';
 redirect_if_not_logged_in();
-require_admin($pdo);
+require_permission($pdo, 'export_journal');
 
 /* ---------- Autoload PhpSpreadsheet ---------- */
 $autoloadCandidates = [

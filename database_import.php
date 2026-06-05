@@ -4,7 +4,7 @@ declare(strict_types=1);
 require __DIR__ . '/config.php';
 require __DIR__ . '/helpers.php';
 redirect_if_not_logged_in();
-require_admin($pdo);
+require_permission($pdo, 'run_database_tools');
 
 set_time_limit(0);
 @ini_set('memory_limit', '512M');
