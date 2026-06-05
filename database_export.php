@@ -36,6 +36,44 @@ function db_sql_literal(PDO $pdo, mixed $value): string {
     return '0x' . bin2hex($value);
 }
 
+function db_normalize_sql_collations(string $sql): string
+{
+    $sql = str_replace(
+        [
+            'utf8mb4_uca1400_ai_ci',
+            'utf8mb4_0900_ai_ci',
+        ],
+        'utf8mb4_unicode_ci',
+        $sql
+    );
+
+    $sql = preg_replace(
+        '/DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_[a-z0-9_]+/i',
+        'DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci',
+        $sql
+    ) ?? $sql;
+
+    $sql = preg_replace(
+        '/CHARACTER SET utf8mb4 COLLATE utf8mb4_[a-z0-9_]+/i',
+        'CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
+        $sql
+    ) ?? $sql;
+
+    $sql = preg_replace(
+        '/COLLATE=utf8mb4_[a-z0-9_]+/i',
+        'COLLATE=utf8mb4_unicode_ci',
+        $sql
+    ) ?? $sql;
+
+    $sql = preg_replace(
+        '/COLLATE utf8mb4_[a-z0-9_]+/i',
+        'COLLATE utf8mb4_unicode_ci',
+        $sql
+    ) ?? $sql;
+
+    return $sql;
+}
+
 $databaseName = (string)$pdo->query('SELECT DATABASE()')->fetchColumn();
 if ($databaseName === '') {
     http_response_code(500);
@@ -64,6 +102,7 @@ echo "-- Maorin Builders database backup\n";
 echo "-- Database: {$databaseName}\n";
 echo "-- Generated: " . date('Y-m-d H:i:s') . "\n\n";
 echo "SET NAMES utf8mb4;\n";
+echo "SET collation_connection = 'utf8mb4_unicode_ci';\n";
 echo "SET FOREIGN_KEY_CHECKS=0;\n\n";
 
 foreach ($tables as $table) {
@@ -78,7 +117,8 @@ foreach ($tables as $table) {
     if (!$createRow || !isset($createRow['Create Table'])) {
         continue;
     }
-    echo $createRow['Create Table'] . ";\n\n";
+    $createSql = db_normalize_sql_collations((string)$createRow['Create Table']);
+    echo $createSql . ";\n\n";
 
     $columns = [];
     $colStmt = $pdo->query("SHOW COLUMNS FROM {$quotedTable}");
