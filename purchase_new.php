@@ -2,6 +2,7 @@
 require "config.php";
 require "helpers.php";
 redirect_if_not_logged_in();
+require_permission($pdo, 'create_journal');
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();

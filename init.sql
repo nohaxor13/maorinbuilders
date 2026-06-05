@@ -13,6 +13,63 @@ CREATE TABLE user_roles (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE roles (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  slug VARCHAR(64) NOT NULL UNIQUE,
+  name VARCHAR(120) NOT NULL,
+  is_system TINYINT(1) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE role_permissions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  role_slug VARCHAR(64) NOT NULL,
+  permission_key VARCHAR(64) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_role_permission (role_slug, permission_key),
+  INDEX idx_role_permissions_role (role_slug),
+  FOREIGN KEY (role_slug) REFERENCES roles(slug) ON DELETE CASCADE
+);
+
+INSERT INTO roles (slug, name, is_system) VALUES
+  ('admin', 'Administrator', 1),
+  ('staff', 'Staff', 1),
+  ('accounting', 'Accounting', 1),
+  ('warehouse', 'Warehouse', 1);
+
+INSERT INTO role_permissions (role_slug, permission_key) VALUES
+  ('admin', 'access_admin_panel'),
+  ('admin', 'manage_roles'),
+  ('admin', 'manage_staff'),
+  ('admin', 'view_account_dashboard'),
+  ('admin', 'view_journal'),
+  ('admin', 'create_journal'),
+  ('admin', 'edit_journal'),
+  ('admin', 'delete_journal'),
+  ('admin', 'export_journal'),
+  ('admin', 'import_journal'),
+  ('admin', 'view_inquiries'),
+  ('admin', 'manage_company_content'),
+  ('admin', 'manage_client_portal'),
+  ('admin', 'run_database_tools'),
+  ('staff', 'view_account_dashboard'),
+  ('staff', 'view_journal'),
+  ('staff', 'create_journal'),
+  ('staff', 'edit_journal'),
+  ('staff', 'view_inquiries'),
+  ('accounting', 'view_account_dashboard'),
+  ('accounting', 'view_journal'),
+  ('accounting', 'create_journal'),
+  ('accounting', 'edit_journal'),
+  ('accounting', 'delete_journal'),
+  ('accounting', 'export_journal'),
+  ('accounting', 'import_journal'),
+  ('accounting', 'view_inquiries'),
+  ('warehouse', 'view_account_dashboard'),
+  ('warehouse', 'view_journal'),
+  ('warehouse', 'create_journal');
+
 CREATE TABLE staff_profiles (
   user_id INT PRIMARY KEY,
   job_title VARCHAR(120) NULL,

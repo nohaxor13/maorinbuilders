@@ -4,7 +4,7 @@ declare(strict_types=1);
 require __DIR__ . '/config.php';
 require __DIR__ . '/helpers.php';
 redirect_if_not_logged_in();
-require_admin($pdo);
+require_permission($pdo, 'run_database_tools');
 
 set_time_limit(0);
 @ini_set('memory_limit', '512M');
@@ -72,6 +72,44 @@ function db_import_split_sql(string $sql): array {
     return $statements;
 }
 
+function db_normalize_sql_collations(string $sql): string
+{
+    $sql = str_replace(
+        [
+            'utf8mb4_uca1400_ai_ci',
+            'utf8mb4_0900_ai_ci',
+        ],
+        'utf8mb4_unicode_ci',
+        $sql
+    );
+
+    $sql = preg_replace(
+        '/DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_[a-z0-9_]+/i',
+        'DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci',
+        $sql
+    ) ?? $sql;
+
+    $sql = preg_replace(
+        '/CHARACTER SET utf8mb4 COLLATE utf8mb4_[a-z0-9_]+/i',
+        'CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
+        $sql
+    ) ?? $sql;
+
+    $sql = preg_replace(
+        '/COLLATE=utf8mb4_[a-z0-9_]+/i',
+        'COLLATE=utf8mb4_unicode_ci',
+        $sql
+    ) ?? $sql;
+
+    $sql = preg_replace(
+        '/COLLATE utf8mb4_[a-z0-9_]+/i',
+        'COLLATE utf8mb4_unicode_ci',
+        $sql
+    ) ?? $sql;
+
+    return $sql;
+}
+
 function db_import_is_patch_safe_error(Throwable $e): bool {
     $message = strtolower($e->getMessage());
     $safeFragments = [
@@ -135,6 +173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'The uploaded file is empty.';
             } else {
                 try {
+                    $sql = db_normalize_sql_collations($sql);
                     $statements = db_import_split_sql($sql);
                     $executed = 0;
                     $skipped = 0;

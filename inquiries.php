@@ -4,6 +4,7 @@ declare(strict_types=1);
 require __DIR__ . '/config.php';
 require __DIR__ . '/helpers.php';
 redirect_if_not_logged_in();
+require_permission($pdo, 'view_inquiries');
 
 // Ensure table exists (so page doesn't crash on fresh installs)
 $pdo->exec(

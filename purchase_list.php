@@ -2,6 +2,7 @@
 require "config.php";
 require "helpers.php";
 redirect_if_not_logged_in();
+require_permission($pdo, 'view_journal');
 $isAdmin = current_user_is_admin($pdo);
 
 include "templates/header.php";

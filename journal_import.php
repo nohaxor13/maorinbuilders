@@ -22,7 +22,7 @@ $DEBUG = isset($_GET['debug']) && $_GET['debug'] === '1';
 require "config.php";
 require "helpers.php";
 redirect_if_not_logged_in();
-require_admin($pdo);
+require_permission($pdo, 'import_journal');
 
 // ----- autoload -----
 $autoloadCandidates = [

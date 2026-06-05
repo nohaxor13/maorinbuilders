@@ -5,6 +5,7 @@ require "helpers.php";
 redirect_if_not_logged_in();
 ensure_staff_profiles_table($pdo);
 ensure_staff_activity_log_table($pdo);
+require_permission($pdo, 'view_account_dashboard');
 
 $userId = (int)$_SESSION["user_id"];
 $flashSuccess = '';

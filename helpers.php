@@ -110,6 +110,98 @@ if (!function_exists('ensure_table_user_roles')) {
     }
 }
 
+if (!function_exists('permission_catalog')) {
+    function permission_catalog(): array {
+        return [
+            'access_admin_panel' => 'Access Admin Panel',
+            'manage_roles' => 'Manage Roles and Permissions',
+            'manage_staff' => 'Manage Staff Accounts',
+            'view_account_dashboard' => 'View Account Dashboard',
+            'view_journal' => 'View Journal',
+            'create_journal' => 'Create Journal Entries',
+            'edit_journal' => 'Edit Journal Entries',
+            'delete_journal' => 'Delete Journal Entries',
+            'export_journal' => 'Export Journal',
+            'import_journal' => 'Import Journal',
+            'view_inquiries' => 'View Inquiries',
+            'manage_company_content' => 'Manage Company Content',
+            'manage_client_portal' => 'Manage Client Portal',
+            'run_database_tools' => 'Run Database Tools',
+        ];
+    }
+}
+
+if (!function_exists('default_role_permissions')) {
+    function default_role_permissions(): array {
+        return [
+            'admin' => array_keys(permission_catalog()),
+            'staff' => [
+                'view_account_dashboard',
+                'view_journal',
+                'create_journal',
+                'edit_journal',
+                'view_inquiries',
+            ],
+            'accounting' => [
+                'view_account_dashboard',
+                'view_journal',
+                'create_journal',
+                'edit_journal',
+                'delete_journal',
+                'export_journal',
+                'import_journal',
+                'view_inquiries',
+            ],
+            'warehouse' => [
+                'view_account_dashboard',
+                'view_journal',
+                'create_journal',
+            ],
+        ];
+    }
+}
+
+if (!function_exists('ensure_roles_permissions_tables')) {
+    function ensure_roles_permissions_tables(PDO $pdo): void {
+        ensure_table_user_roles($pdo);
+        $pdo->exec("CREATE TABLE IF NOT EXISTS roles (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            slug VARCHAR(64) NOT NULL UNIQUE,
+            name VARCHAR(120) NOT NULL,
+            is_system TINYINT(1) NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS role_permissions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            role_slug VARCHAR(64) NOT NULL,
+            permission_key VARCHAR(64) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_role_permission (role_slug, permission_key),
+            INDEX idx_role_permissions_role (role_slug),
+            FOREIGN KEY (role_slug) REFERENCES roles(slug) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $defaults = [
+            ['admin', 'Administrator', 1],
+            ['staff', 'Staff', 1],
+            ['accounting', 'Accounting', 1],
+            ['warehouse', 'Warehouse', 1],
+        ];
+        $stmt = $pdo->prepare("INSERT IGNORE INTO roles (slug, name, is_system) VALUES (?, ?, ?)");
+        foreach ($defaults as [$slug, $name, $isSystem]) {
+            $stmt->execute([$slug, $name, $isSystem]);
+        }
+
+        $permStmt = $pdo->prepare("INSERT IGNORE INTO role_permissions (role_slug, permission_key) VALUES (?, ?)");
+        foreach (default_role_permissions() as $roleSlug => $permissions) {
+            foreach ($permissions as $permission) {
+                $permStmt->execute([$roleSlug, $permission]);
+            }
+        }
+    }
+}
+
 if (!function_exists('current_user_role')) {
     function current_user_role(PDO $pdo): string {
         if (empty($_SESSION['user_id'])) return 'guest';
@@ -118,6 +210,35 @@ if (!function_exists('current_user_role')) {
         $st->execute([(int)$_SESSION['user_id']]);
         $r = $st->fetchColumn();
         return $r ? (string)$r : 'staff';
+    }
+}
+
+if (!function_exists('current_user_permissions')) {
+    function current_user_permissions(PDO $pdo): array {
+        if (empty($_SESSION['user_id'])) {
+            return [];
+        }
+        ensure_roles_permissions_tables($pdo);
+        $role = current_user_role($pdo);
+        if ($role === 'admin') {
+            return array_keys(permission_catalog());
+        }
+        $st = $pdo->prepare("SELECT rp.permission_key
+            FROM user_roles ur
+            INNER JOIN role_permissions rp ON rp.role_slug = ur.role
+            WHERE ur.user_id = ?");
+        $st->execute([(int)$_SESSION['user_id']]);
+        $perms = $st->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        return array_values(array_unique(array_map('strval', $perms)));
+    }
+}
+
+if (!function_exists('current_user_can')) {
+    function current_user_can(PDO $pdo, string $permission): bool {
+        if (current_user_role($pdo) === 'admin') {
+            return true;
+        }
+        return in_array($permission, current_user_permissions($pdo), true);
     }
 }
 
@@ -141,6 +262,16 @@ if (!function_exists('current_user_is_admin')) {
 if (!function_exists('require_admin')) {
     function require_admin(PDO $pdo): void {
         require_role($pdo, ['admin']);
+    }
+}
+
+if (!function_exists('require_permission')) {
+    function require_permission(PDO $pdo, string $permission): void {
+        if (!current_user_can($pdo, $permission)) {
+            http_response_code(403);
+            echo "Forbidden";
+            exit;
+        }
     }
 }
 

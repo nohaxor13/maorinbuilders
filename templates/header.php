@@ -70,15 +70,23 @@ if (!function_exists('is_logged_in')) {
           <div class="navbar-nav me-auto mb-2 mb-lg-0 align-items-lg-center gap-lg-1">
             <?php if (is_logged_in()): ?>
               <div class="nav-section-label d-lg-none">Workspace</div>
-              <a class="nav-link nav-pill<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'purchase_new.php' ? ' active' : '' ?>" href="purchase_new.php">New Entry</a>
-              <a class="nav-link nav-pill<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'purchase_list.php' ? ' active' : '' ?>" href="purchase_list.php">Journal</a>
-              <a class="nav-link nav-pill<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'account_dashboard.php' ? ' active' : '' ?>" href="account_dashboard.php">Account Dashboard</a>
+              <?php if (isset($pdo) && function_exists('current_user_can') && current_user_can($pdo, 'create_journal')): ?>
+                <a class="nav-link nav-pill<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'purchase_new.php' ? ' active' : '' ?>" href="purchase_new.php">New Entry</a>
+              <?php endif; ?>
+              <?php if (isset($pdo) && function_exists('current_user_can') && current_user_can($pdo, 'view_journal')): ?>
+                <a class="nav-link nav-pill<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'purchase_list.php' ? ' active' : '' ?>" href="purchase_list.php">Journal</a>
+              <?php endif; ?>
+              <?php if (isset($pdo) && function_exists('current_user_can') && current_user_can($pdo, 'view_account_dashboard')): ?>
+                <a class="nav-link nav-pill<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'account_dashboard.php' ? ' active' : '' ?>" href="account_dashboard.php">Account Dashboard</a>
+              <?php endif; ?>
               <span class="nav-divider d-none d-lg-block"></span>
               <div class="nav-section-label d-lg-none">Management</div>
-              <?php if (isset($pdo) && function_exists('current_user_is_admin') && current_user_is_admin($pdo)): ?>
+              <?php if (isset($pdo) && function_exists('current_user_can') && current_user_can($pdo, 'access_admin_panel')): ?>
                 <a class="nav-link nav-pill<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'admin.php' ? ' active' : '' ?>" href="admin.php">Admin</a>
               <?php endif; ?>
-              <a class="nav-link nav-pill<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'inquiries.php' ? ' active' : '' ?>" href="inquiries.php">Inquiries</a>
+              <?php if (isset($pdo) && function_exists('current_user_can') && current_user_can($pdo, 'view_inquiries')): ?>
+                <a class="nav-link nav-pill<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'inquiries.php' ? ' active' : '' ?>" href="inquiries.php">Inquiries</a>
+              <?php endif; ?>
               <a class="nav-link nav-pill text-warning" href="logout.php">Logout</a>
             <?php else: ?>
               <a class="nav-link nav-pill<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'login.php' ? ' active' : '' ?>" href="login.php">Account Dashboard</a>
