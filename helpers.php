@@ -642,6 +642,76 @@ if (!function_exists('ensure_maorin_workspace_tables')) {
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             INDEX idx_mb_estimates_project (project_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        // Professional estimate builder expansion: guarded columns for existing installations.
+        $mbEstimateColumns = [
+            'project_type' => "VARCHAR(80) NULL",
+            'location' => "VARCHAR(255) NULL",
+            'floor_area' => "DECIMAL(12,2) NOT NULL DEFAULT 0",
+            'floors' => "INT NOT NULL DEFAULT 1",
+            'duration_days' => "INT NOT NULL DEFAULT 0",
+            'target_start_date' => "DATE NULL",
+            'target_end_date' => "DATE NULL",
+            'professional_fee' => "DECIMAL(14,2) NOT NULL DEFAULT 0",
+            'permit_fee' => "DECIMAL(14,2) NOT NULL DEFAULT 0",
+            'mobilization_fee' => "DECIMAL(14,2) NOT NULL DEFAULT 0",
+            'supervision_fee' => "DECIMAL(14,2) NOT NULL DEFAULT 0",
+            'contingency_percent' => "DECIMAL(8,2) NOT NULL DEFAULT 10",
+            'contingency_amount' => "DECIMAL(14,2) NOT NULL DEFAULT 0",
+            'discount_amount' => "DECIMAL(14,2) NOT NULL DEFAULT 0",
+            'target_margin_percent' => "DECIMAL(8,2) NOT NULL DEFAULT 15",
+            'profit_amount' => "DECIMAL(14,2) NOT NULL DEFAULT 0",
+            'profit_margin_percent' => "DECIMAL(8,2) NOT NULL DEFAULT 0",
+            'risk_level' => "VARCHAR(32) NOT NULL DEFAULT 'review'"
+        ];
+        $colCheck = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mb_estimates' AND COLUMN_NAME = ?");
+        foreach ($mbEstimateColumns as $col => $def) {
+            $colCheck->execute([$col]);
+            if ((int)$colCheck->fetchColumn() === 0) {
+                $pdo->exec("ALTER TABLE mb_estimates ADD COLUMN `{$col}` {$def}");
+            }
+        }
+        $pdo->exec("CREATE TABLE IF NOT EXISTS mb_estimate_materials (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            estimate_id INT NOT NULL,
+            material_name VARCHAR(180) NOT NULL,
+            unit VARCHAR(40) NULL,
+            quantity DECIMAL(14,3) NOT NULL DEFAULT 0,
+            unit_cost DECIMAL(14,2) NOT NULL DEFAULT 0,
+            waste_percent DECIMAL(8,2) NOT NULL DEFAULT 0,
+            supplier VARCHAR(180) NULL,
+            line_total DECIMAL(14,2) NOT NULL DEFAULT 0,
+            sort_order INT NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_mb_estimate_materials_estimate (estimate_id),
+            FOREIGN KEY (estimate_id) REFERENCES mb_estimates(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS mb_estimate_labor (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            estimate_id INT NOT NULL,
+            role_name VARCHAR(180) NOT NULL,
+            worker_count DECIMAL(10,2) NOT NULL DEFAULT 0,
+            daily_rate DECIMAL(14,2) NOT NULL DEFAULT 0,
+            days_count DECIMAL(10,2) NOT NULL DEFAULT 0,
+            line_total DECIMAL(14,2) NOT NULL DEFAULT 0,
+            sort_order INT NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_mb_estimate_labor_estimate (estimate_id),
+            FOREIGN KEY (estimate_id) REFERENCES mb_estimates(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS mb_estimate_equipment (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            estimate_id INT NOT NULL,
+            equipment_name VARCHAR(180) NOT NULL,
+            rate_type VARCHAR(40) NOT NULL DEFAULT 'daily',
+            rate DECIMAL(14,2) NOT NULL DEFAULT 0,
+            duration DECIMAL(10,2) NOT NULL DEFAULT 0,
+            line_total DECIMAL(14,2) NOT NULL DEFAULT 0,
+            sort_order INT NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_mb_estimate_equipment_estimate (estimate_id),
+            FOREIGN KEY (estimate_id) REFERENCES mb_estimates(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
         $pdo->exec("CREATE TABLE IF NOT EXISTS mb_proposals (
             id INT AUTO_INCREMENT PRIMARY KEY,
             project_id INT NULL,
