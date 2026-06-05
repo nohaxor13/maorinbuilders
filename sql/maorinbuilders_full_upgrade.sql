@@ -50,3 +50,26 @@ CREATE TABLE IF NOT EXISTS mb_estimate_labor (
 CREATE TABLE IF NOT EXISTS mb_estimate_equipment (
  id INT AUTO_INCREMENT PRIMARY KEY, estimate_id INT NOT NULL, equipment_name VARCHAR(180) NOT NULL, rate_type VARCHAR(40) NOT NULL DEFAULT 'daily', rate DECIMAL(14,2) NOT NULL DEFAULT 0, duration DECIMAL(10,2) NOT NULL DEFAULT 0, line_total DECIMAL(14,2) NOT NULL DEFAULT 0, sort_order INT NOT NULL DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX idx_mb_estimate_equipment_estimate (estimate_id), FOREIGN KEY (estimate_id) REFERENCES mb_estimates(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Workspace SPA professional estimate/proposal/project enhancement
+ALTER TABLE mb_proposals ADD COLUMN IF NOT EXISTS location VARCHAR(255) NULL;
+ALTER TABLE mb_proposals ADD COLUMN IF NOT EXISTS project_type VARCHAR(80) NULL;
+ALTER TABLE mb_proposals ADD COLUMN IF NOT EXISTS payment_terms TEXT NULL;
+ALTER TABLE mb_proposals ADD COLUMN IF NOT EXISTS exclusions TEXT NULL;
+ALTER TABLE mb_proposals ADD COLUMN IF NOT EXISTS timeline_days INT NOT NULL DEFAULT 0;
+ALTER TABLE mb_proposals ADD COLUMN IF NOT EXISTS approved_at DATETIME NULL;
+ALTER TABLE mb_proposals ADD COLUMN IF NOT EXISTS approved_by INT NULL;
+ALTER TABLE mb_projects ADD COLUMN IF NOT EXISTS contract_start_date DATE NULL;
+ALTER TABLE mb_projects ADD COLUMN IF NOT EXISTS site_contact VARCHAR(180) NULL;
+ALTER TABLE mb_projects ADD COLUMN IF NOT EXISTS priority VARCHAR(32) NOT NULL DEFAULT 'normal';
+CREATE TABLE IF NOT EXISTS mb_project_milestones (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  project_id INT NOT NULL,
+  title VARCHAR(180) NOT NULL,
+  target_date DATE NULL,
+  status VARCHAR(32) NOT NULL DEFAULT 'pending',
+  notes TEXT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_project_milestones_project(project_id),
+  CONSTRAINT fk_mb_project_milestones_project FOREIGN KEY(project_id) REFERENCES mb_projects(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
