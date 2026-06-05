@@ -51,6 +51,7 @@ class ExcelWriter {
     $sheet->freezePane('A2');
 
     $writer = new Xlsx($ss);
+    $writer->setPreCalculateFormulas(false);
     $writer->save($outPath);
   }
 }

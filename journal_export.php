@@ -263,7 +263,9 @@ try {
   header('Pragma: no-cache');
   header('Expires: 0');
 
+  $spreadsheet->garbageCollect();
   $writer = new Xlsx($spreadsheet);
+  $writer->setPreCalculateFormulas(false);
   $writer->save('php://output');
   exit;
 
