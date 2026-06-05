@@ -1,0 +1,373 @@
+<?php
+// helpers.php
+
+// Start session if not started yet (safe across includes)
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
+
+if (!function_exists('calc_purchase')) {
+    function calc_purchase($vatable, $non_vat, $net, $vat_nvat = 'VAT') {
+        // Normalize numeric inputs
+        $vatable = floatval($vatable);
+        $non_vat = floatval($non_vat);
+        $net     = floatval($net);
+
+        $mode     = strtoupper((string)$vat_nvat);
+        $isNonVAT = ($mode === 'NONVAT' || $mode === 'NON-VAT');
+
+        if ($isNonVAT) {
+            // NON-VAT MODE:
+            // If Net is entered, NonVAT = Net, other computed fields = 0
+            if ($net > 0) {
+                $non_vat = round($net, 2);
+            } else {
+                // If no net provided, keep provided non_vat as-is (rounded)
+                $non_vat = round($non_vat, 2);
+            }
+
+            $vatable   = 0.00;
+            $input_vat = 0.00;
+            $total     = round($non_vat, 2);
+            $cash      = $total; // no VAT in NON-VAT mode
+        } else {
+            // VAT MODE:
+            // Enforce business rule: NON-VAT must be ignored/cleared
+            $non_vat = 0.00;
+
+            // If Net provided, derive vatable from net; else use given vatable
+            if ($net > 0) {
+                $vatable = round($net / 1.12, 2);
+            } else {
+                $vatable = round($vatable, 2);
+            }
+
+            $input_vat = round($vatable * 0.12, 2);
+            $total     = round($vatable + $non_vat, 2); // effectively just vatable
+            $cash      = round($input_vat + $total, 2); // input_vat + vatable
+        }
+
+        return [
+            "vatable"   => $vatable,
+            "non_vat"   => $non_vat,
+            "input_vat" => $input_vat,
+            "total"     => $total,
+            "cash"      => $cash
+        ];
+    }
+}
+
+if (!function_exists('is_logged_in')) {
+    function is_logged_in() {
+        return !empty($_SESSION['user_id']);
+    }
+}
+
+if (!function_exists('redirect_if_not_logged_in')) {
+    function redirect_if_not_logged_in() {
+        if (!is_logged_in()) {
+            header("Location: login.php");
+            exit;
+        }
+    }
+}
+
+if (!function_exists('csrf_token')) {
+    function csrf_token(): string {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
+        if (empty($_SESSION['_csrf_token'])) {
+            $_SESSION['_csrf_token'] = bin2hex(random_bytes(32));
+        }
+        return (string)$_SESSION['_csrf_token'];
+    }
+}
+
+if (!function_exists('csrf_verify')) {
+    function csrf_verify(): void {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
+        $sent = (string)($_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+        $stored = (string)($_SESSION['_csrf_token'] ?? '');
+        if ($sent === '' || $stored === '' || !hash_equals($stored, $sent)) {
+            throw new RuntimeException('Invalid CSRF token.');
+        }
+    }
+}
+
+/* --------------------------------------------------------------------------
+ * Roles (staff/admin/accounting/warehouse/client)
+ * -------------------------------------------------------------------------- */
+if (!function_exists('ensure_table_user_roles')) {
+    function ensure_table_user_roles(PDO $pdo): void {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS user_roles (
+            user_id INT PRIMARY KEY,
+            role VARCHAR(32) NOT NULL DEFAULT 'staff',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+}
+
+if (!function_exists('current_user_role')) {
+    function current_user_role(PDO $pdo): string {
+        if (empty($_SESSION['user_id'])) return 'guest';
+        ensure_table_user_roles($pdo);
+        $st = $pdo->prepare("SELECT role FROM user_roles WHERE user_id = ? LIMIT 1");
+        $st->execute([(int)$_SESSION['user_id']]);
+        $r = $st->fetchColumn();
+        return $r ? (string)$r : 'staff';
+    }
+}
+
+if (!function_exists('require_role')) {
+    function require_role(PDO $pdo, array $roles): void {
+        $role = current_user_role($pdo);
+        if (!in_array($role, $roles, true)) {
+            http_response_code(403);
+            echo "Forbidden";
+            exit;
+        }
+    }
+}
+
+if (!function_exists('current_user_is_admin')) {
+    function current_user_is_admin(PDO $pdo): bool {
+        return current_user_role($pdo) === 'admin';
+    }
+}
+
+if (!function_exists('require_admin')) {
+    function require_admin(PDO $pdo): void {
+        require_role($pdo, ['admin']);
+    }
+}
+
+if (!function_exists('ensure_staff_profiles_table')) {
+    function ensure_staff_profiles_table(PDO $pdo): void {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS staff_profiles (
+            user_id INT PRIMARY KEY,
+            job_title VARCHAR(120) NULL,
+            department VARCHAR(120) NULL,
+            phone VARCHAR(64) NULL,
+            address VARCHAR(255) NULL,
+            bio TEXT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+}
+
+if (!function_exists('ensure_staff_activity_log_table')) {
+    function ensure_staff_activity_log_table(PDO $pdo): void {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS staff_activity_log (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            actor_id INT NULL,
+            action VARCHAR(120) NOT NULL,
+            details TEXT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_staff_activity_user (user_id, created_at),
+            INDEX idx_staff_activity_actor (actor_id, created_at),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+}
+
+if (!function_exists('ensure_content_catalog_tables')) {
+    function ensure_content_catalog_tables(PDO $pdo): void {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS website_projects (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            slug VARCHAR(64) NOT NULL UNIQUE,
+            title VARCHAR(160) NOT NULL,
+            location VARCHAR(160) NULL,
+            year VARCHAR(16) NULL,
+            type VARCHAR(64) NULL,
+            status VARCHAR(32) NOT NULL DEFAULT 'Ongoing',
+            cover VARCHAR(255) NULL,
+            before_image VARCHAR(255) NULL,
+            after_image VARCHAR(255) NULL,
+            summary TEXT NULL,
+            materials TEXT NULL,
+            gallery TEXT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $pdo->exec("CREATE TABLE IF NOT EXISTS website_project_media (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            project_id INT NOT NULL,
+            media_type VARCHAR(32) NOT NULL DEFAULT 'gallery',
+            path VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_project_media_project (project_id, created_at),
+            FOREIGN KEY (project_id) REFERENCES website_projects(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $pdo->exec("CREATE TABLE IF NOT EXISTS website_services (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            slug VARCHAR(64) NOT NULL UNIQUE,
+            name VARCHAR(160) NOT NULL,
+            desc_text TEXT NOT NULL,
+            href VARCHAR(255) NULL,
+            range_text VARCHAR(120) NULL,
+            timeline_text VARCHAR(120) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+}
+
+if (!function_exists('log_staff_activity')) {
+    function log_staff_activity(PDO $pdo, int $userId, string $action, ?string $details = null, ?int $actorId = null): void {
+        ensure_staff_activity_log_table($pdo);
+        $st = $pdo->prepare("INSERT INTO staff_activity_log (user_id, actor_id, action, details) VALUES (?, ?, ?, ?)");
+        $st->execute([$userId, $actorId, $action, $details]);
+    }
+}
+
+
+
+/* --------------------------------------------------------------------------
+ * Client Portal helpers
+ * -------------------------------------------------------------------------- */
+if (!function_exists('ensure_client_portal_tables')) {
+    function ensure_client_portal_tables(PDO $pdo): void {
+        // Clients
+        $pdo->exec("CREATE TABLE IF NOT EXISTS website_clients (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            email VARCHAR(255) NOT NULL UNIQUE,
+            phone VARCHAR(64) NULL,
+            password_hash VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        // Client access to projects (project_id matches public/data/projects.php ids, e.g. p1)
+        $pdo->exec("CREATE TABLE IF NOT EXISTS website_client_projects (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            client_id INT NOT NULL,
+            project_id VARCHAR(64) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_client_project (client_id, project_id),
+            FOREIGN KEY (client_id) REFERENCES website_clients(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        // Per-project status info (editable by staff)
+        $pdo->exec("CREATE TABLE IF NOT EXISTS website_project_status (
+            project_id VARCHAR(64) PRIMARY KEY,
+            status_label VARCHAR(64) NOT NULL DEFAULT 'Ongoing',
+            progress_percent TINYINT UNSIGNED NOT NULL DEFAULT 0,
+            start_date DATE NULL,
+            target_end_date DATE NULL,
+            last_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            note TEXT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        // Secure files (stored in /storage/uploads/project_files/, served via /client/download.php)
+        $pdo->exec("CREATE TABLE IF NOT EXISTS website_project_files (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            project_id VARCHAR(64) NOT NULL,
+            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            kind VARCHAR(64) NOT NULL DEFAULT 'Document',
+            display_name VARCHAR(255) NOT NULL,
+            stored_name VARCHAR(255) NOT NULL,
+            mime VARCHAR(120) NULL,
+            size_bytes INT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        // Payment schedule
+        $pdo->exec("CREATE TABLE IF NOT EXISTS website_project_payments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            project_id VARCHAR(64) NOT NULL,
+            due_date DATE NULL,
+            label VARCHAR(160) NOT NULL,
+            amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+            status ENUM('pending','paid') NOT NULL DEFAULT 'pending',
+            paid_at DATE NULL,
+            note VARCHAR(255) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+}
+
+/* --------------------------------------------------------------------------
+ * Site settings / maintenance mode
+ * -------------------------------------------------------------------------- */
+if (!function_exists('ensure_site_settings_table')) {
+    function ensure_site_settings_table(PDO $pdo): void {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS site_settings (
+            setting_key VARCHAR(64) PRIMARY KEY,
+            setting_value LONGTEXT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $pdo->exec("INSERT IGNORE INTO site_settings (setting_key, setting_value) VALUES
+            ('maintenance_mode', '0'),
+            ('maintenance_message', 'We are currently doing maintenance. Please check back later.'),
+            ('maintenance_retry_after', '3600')");
+    }
+}
+
+if (!function_exists('site_setting_get')) {
+    function site_setting_get(PDO $pdo, string $key, $default = null) {
+        ensure_site_settings_table($pdo);
+        $st = $pdo->prepare("SELECT setting_value FROM site_settings WHERE setting_key = ? LIMIT 1");
+        $st->execute([$key]);
+        $value = $st->fetchColumn();
+        return $value === false ? $default : $value;
+    }
+}
+
+if (!function_exists('site_setting_set')) {
+    function site_setting_set(PDO $pdo, string $key, string $value): void {
+        ensure_site_settings_table($pdo);
+        $st = $pdo->prepare(
+            "INSERT INTO site_settings (setting_key, setting_value)
+             VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)"
+        );
+        $st->execute([$key, $value]);
+    }
+}
+
+if (!function_exists('maintenance_mode_is_enabled')) {
+    function maintenance_mode_is_enabled(PDO $pdo): bool {
+        return (string)site_setting_get($pdo, 'maintenance_mode', '0') === '1';
+    }
+}
+
+if (!function_exists('maintenance_mode_message')) {
+    function maintenance_mode_message(PDO $pdo): string {
+        return trim((string)site_setting_get($pdo, 'maintenance_message', 'We are currently doing maintenance. Please check back later.')) ?: 'We are currently doing maintenance. Please check back later.';
+    }
+}
+
+if (!function_exists('is_client_logged_in')) {
+    function is_client_logged_in(): bool {
+        return !empty($_SESSION['client_id']);
+    }
+}
+
+if (!function_exists('redirect_client_if_not_logged_in')) {
+    function redirect_client_if_not_logged_in(): void {
+        if (!is_client_logged_in()) {
+            header('Location: login.php');
+            exit;
+        }
+    }
+}
+
+if (!function_exists('client_can_access_project')) {
+    function client_can_access_project(PDO $pdo, int $client_id, string $project_id): bool {
+        ensure_client_portal_tables($pdo);
+        $st = $pdo->prepare("SELECT 1 FROM website_client_projects WHERE client_id=? AND project_id=? LIMIT 1");
+        $st->execute([$client_id, $project_id]);
+        return (bool)$st->fetchColumn();
+    }
+}
+
+?>

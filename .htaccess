@@ -1,0 +1,17 @@
+# Maorin Builders - basic hardening for Apache
+
+# Deny direct access to key internal files (works on most hosts)
+<IfModule mod_authz_core.c>
+  <FilesMatch "^(composer\.(json|lock)|config\.php|helpers\.php|google_sync\.php)$">
+    Require all denied
+  </FilesMatch>
+</IfModule>
+
+# Block internal directories via rewrite (safe for shared hosting)
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^(vendor|lib|logs|templates)/ - [F,L]
+  # Allow public project photos under storage/uploads/, block the rest of storage
+  RewriteRule ^storage/(?!uploads/).* - [F,L]
+  RewriteRule ^(composer\.(json|lock)|config\.php|helpers\.php|google_sync\.php)$ - [F,L]
+</IfModule>

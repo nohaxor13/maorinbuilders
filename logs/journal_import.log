@@ -1,0 +1,18 @@
+[2025-09-20 12:05:36] Failed to read Excel. Ensure PHP extension 'zip' is enabled. Inner: Class "ZipArchive" not found
+#0 {main}
+[2025-09-20 12:19:03] Failed to read Excel. Ensure PHP extension 'zip' is enabled. Inner: Class "ZipArchive" not found
+#0 {main}
+[2025-09-20 12:30:15] Call to undefined method PhpOffice\PhpSpreadsheet\Worksheet\Worksheet::getCellByColumnAndRow()
+#0 {main}
+[2025-09-20 12:30:59] Call to undefined method PhpOffice\PhpSpreadsheet\Worksheet\Worksheet::getCellByColumnAndRow()
+#0 {main}
+[2025-09-20 12:37:17] SQLSTATE[23000]: Integrity constraint violation: 1048 Column 'date' cannot be null
+#0 C:\xampp\htdocs\maorinbuilders\journal_import.php(226): PDOStatement->execute(Array)
+#1 {main}
+[2025-09-20 12:44:04] SQLSTATE[23000]: Integrity constraint violation: 1048 Column 'date' cannot be null
+#0 C:\xampp\htdocs\maorinbuilders\journal_import.php(226): PDOStatement->execute(Array)
+#1 {main}
+[2025-09-21 18:13:31] Could not locate header row; please use the reference layout.
+#0 {main}
+[2025-09-21 18:13:36] Could not locate header row; please use the reference layout.
+#0 {main}

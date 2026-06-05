@@ -1,0 +1,451 @@
+<?php
+// ------------------------------------------------------------
+// purchase_edit.php
+// Edit an existing purchase entry (idempotent save via nonce)
+// ------------------------------------------------------------
+
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
+
+require "config.php";
+require "helpers.php";
+redirect_if_not_logged_in();
+
+// Track used nonces in-session
+$_SESSION['nonce_used'] = $_SESSION['nonce_used'] ?? [];
+
+// Editing mode
+$edit_id = (int)($_GET['id'] ?? 0);
+if ($edit_id <= 0) {
+    http_response_code(400);
+    die("Missing or invalid id.");
+}
+
+// Load existing entry (must belong to current user)
+$userId = (int)($_SESSION['user_id'] ?? 0);
+
+$stmt = $pdo->prepare("SELECT * FROM purchase_entries WHERE id = ? AND user_id = ? LIMIT 1");
+$stmt->execute([$edit_id, $userId]);
+$entry = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$entry) {
+    http_response_code(404);
+    die("Entry not found.");
+}
+
+$success = false;
+$already_saved = false;
+$error_msg = '';
+$errors = [];
+
+/* ---------- helpers ---------- */
+
+// Avoid fatal "Cannot redeclare old()" if helpers.php already defines it
+if (!function_exists('old')) {
+    function old($key, $default = "") {
+        global $entry;
+        if (isset($_POST[$key])) return htmlspecialchars((string)$_POST[$key]);
+        if (isset($entry[$key])) return htmlspecialchars((string)$entry[$key]);
+        return htmlspecialchars((string)$default);
+    }
+}
+
+// Fetch suggestions for datalists (project names, categories, account titles)
+$project_suggestions = [];
+$category_suggestions = [];
+$account_title_suggestions = [];
+
+try {
+    $stmt = $pdo->query("
+        SELECT project_name, COUNT(*) c
+        FROM purchase_entries
+        WHERE project_name IS NOT NULL AND project_name <> ''
+        GROUP BY project_name
+        ORDER BY c DESC, project_name ASC
+        LIMIT 50
+    ");
+    $project_suggestions = $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
+
+    $stmt = $pdo->query("
+        SELECT category, COUNT(*) c
+        FROM purchase_entries
+        WHERE category IS NOT NULL AND category <> ''
+        GROUP BY category
+        ORDER BY c DESC, category ASC
+        LIMIT 50
+    ");
+    $category_suggestions = $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
+
+    $stmt = $pdo->query("
+        SELECT account_title, COUNT(*) c
+        FROM purchase_entries
+        WHERE account_title IS NOT NULL AND account_title <> ''
+        GROUP BY account_title
+        ORDER BY c DESC, account_title ASC
+        LIMIT 50
+    ");
+    $account_title_suggestions = $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
+} catch (Throwable $e) {
+    // suggestions are optional
+}
+
+/* ---------- GET: prevent caching + issue a fresh nonce ---------- */
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    $_SESSION['form_nonce'] = bin2hex(random_bytes(16));
+    $form_nonce = $_SESSION['form_nonce'];
+}
+
+/* ---------- POST: idempotent, no-redirect ---------- */
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $nonce = $_POST['form_nonce'] ?? '';
+
+    // Validate nonce against current form
+    if (!isset($_SESSION['form_nonce']) || !hash_equals($_SESSION['form_nonce'], $nonce)) {
+        $error_msg = 'This form was already submitted or expired. No changes were saved.';
+        $_SESSION['form_nonce'] = bin2hex(random_bytes(16));
+        $form_nonce = $_SESSION['form_nonce'];
+    }
+    // Same nonce reused (refresh/double-submit) => NO-OP
+    elseif (!empty($_SESSION['nonce_used'][$nonce])) {
+        $already_saved = true;
+        $_SESSION['form_nonce'] = bin2hex(random_bytes(16));
+        $form_nonce = $_SESSION['form_nonce'];
+    }
+    else {
+        // Ensure net has a value even if JS didn't propagate yet
+        if (!isset($_POST['net']) || $_POST['net'] === '') {
+            if (isset($_POST['net_view']) && $_POST['net_view'] !== '') {
+                $_POST['net'] = preg_replace('/,/', '', (string)$_POST['net_view']);
+            }
+        }
+
+        $required = [
+            'supplier'      => 'Supplier is required.',
+            'address'       => 'Address is required.',
+            'tin'           => 'TIN is required.',
+            'description'   => 'Description is required.',
+            'project_name'  => 'Project Name is required.',
+            'net'           => 'Net (helper) is required.',
+        ];
+
+        foreach ($required as $key => $msg) {
+            if (!isset($_POST[$key]) || trim((string)$_POST[$key]) === '') {
+                $errors[] = $msg;
+            }
+        }
+
+        // Net must be numeric
+        if (isset($_POST['net']) && $_POST['net'] !== '') {
+            $netNum = (float)str_replace(',', '', (string)$_POST['net']);
+            if (!is_numeric($_POST['net']) && !is_numeric($netNum)) {
+                $errors[] = 'Net (helper) must be a number.';
+            }
+        }
+
+        if ($errors) {
+            $error_msg = implode(' ', $errors);
+            $_SESSION['form_nonce'] = bin2hex(random_bytes(16));
+            $form_nonce = $_SESSION['form_nonce'];
+        } else {
+            // Compute derived amounts
+            $calc = calc_purchase(
+                $_POST["vatable"] ?? 0,
+                $_POST["non_vat"] ?? 0,
+                $_POST["net"] ?? 0,
+                $_POST["vat_nvat"] ?? 'VAT'
+            );
+
+            $stmt = $pdo->prepare("
+                UPDATE purchase_entries SET
+                  date = ?,
+                  supplier = ?,
+                  ref_page = ?,
+                  tin = ?,
+                  vat_nvat = ?,
+                  address = ?,
+                  category = ?,
+                  description = ?,
+                  project_name = ?,
+                  reference = ?,
+                  input_vat = ?,
+                  vatable = ?,
+                  non_vat = ?,
+                  total = ?,
+                  freight_handling = ?,
+                  cash = ?,
+                  account_title = ?,
+                  debit = ?,
+                  credit = ?,
+                  remarks = ?
+                WHERE id = ? AND user_id = ?
+                LIMIT 1
+            ");
+
+            // ✅ FIXED: comma before $edit_id and cast user_id
+            $stmt->execute([
+                $_POST["date"] ?? date('Y-m-d'),
+                $_POST["supplier"],
+                $_POST["ref_page"] ?? null,
+                $_POST["tin"] ?? null,
+                $_POST["vat_nvat"] ?? 'VAT',
+                $_POST["address"] ?? null,
+                $_POST["category"] ?? null,
+                $_POST["description"] ?? null,
+
+                $_POST["project_name"] ?? null,
+                $_POST["reference"] ?? null,
+
+                $calc["input_vat"],
+                $calc["vatable"],
+                $calc["non_vat"],
+                $calc["total"],
+
+                (($_POST["freight_handling"] ?? '') !== "") ? $_POST["freight_handling"] : 0,
+                $calc["cash"],
+
+                $_POST["account_title"] ?? null,
+                (($_POST["debit"] ?? '') !== "") ? $_POST["debit"] : 0,
+                (($_POST["credit"] ?? '') !== "") ? $_POST["credit"] : 0,
+                $_POST["remarks"] ?? null,
+
+                $edit_id,
+                (int)$_SESSION["user_id"]
+            ]);
+
+            $success = true;
+            $_SESSION['last_purchase_id'] = $edit_id;
+
+            // Success alert summary
+            $saved_date     = $_POST["date"] ?? '';
+            $saved_supplier = $_POST["supplier"] ?? '';
+            $saved_net      = $_POST["net"] ?? ($_POST["net_view"] ?? '');
+            $saved_net_num  = (float)str_replace([',',' '], '', (string)$saved_net);
+            $saved_net_disp = number_format($saved_net_num, 2);
+            $saved_entry_no = (int)$edit_id;
+
+            // Mark nonce as used
+            $_SESSION['nonce_used'][$nonce] = true;
+
+            // Rotate fresh nonce so user can tweak & save again
+            $_SESSION['form_nonce'] = bin2hex(random_bytes(16));
+            $form_nonce = $_SESSION['form_nonce'];
+
+            // Refresh $entry for sticky values after a successful update (optional but nice)
+            $stmt = $pdo->prepare("SELECT * FROM purchase_entries WHERE id = ? AND user_id = ? LIMIT 1");
+            $stmt->execute([$edit_id, $userId]);
+            $entry = $stmt->fetch(PDO::FETCH_ASSOC) ?: $entry;
+        }
+    }
+}
+
+include "templates/header.php";
+?>
+<style>
+.autocomplete-ghost-wrap { position:relative; }
+.autocomplete-ghost{
+  position:absolute; top:0; left:0; color:#bbb; pointer-events:none;
+  font-family:inherit; font-size:inherit; height:100%; line-height:1.5;
+  padding:0.375rem 0.75rem; width:100%; white-space:pre; z-index:1; overflow:hidden;
+}
+</style>
+
+<div class="card p-4">
+  <h3>Edit Purchase Entry</h3>
+
+  <?php if ($success): ?>
+    <div class="alert alert-success mt-2">
+      ✅ Saved <strong>Entry #<?= (int)($saved_entry_no ?? ($_SESSION['last_purchase_id'] ?? 0)) ?></strong>
+      — <strong><?= htmlspecialchars($saved_date ?? "") ?></strong>
+      — <strong><?= htmlspecialchars($saved_supplier ?? "") ?></strong>
+      — Net: <strong>₱<?= htmlspecialchars($saved_net_disp ?? "") ?></strong>
+    </div>
+  <?php elseif ($already_saved): ?>
+    <div class="alert alert-info mt-2">ℹ️ That was a page refresh of your last submission. No changes were saved.</div>
+  <?php elseif ($error_msg): ?>
+    <div class="alert alert-warning mt-2"><?= htmlspecialchars($error_msg) ?></div>
+  <?php endif; ?>
+
+  <form id="purchaseForm" method="post" class="mt-3" autocomplete="off">
+    <input type="hidden" name="form_nonce" value="<?= htmlspecialchars($form_nonce ?? ($_SESSION['form_nonce'] ?? '')) ?>">
+
+    <div class="row g-3">
+
+      <div class="col-md-3">
+        <label class="form-label">Date</label>
+        <input type="date" name="date" class="form-control" required value="<?= old('date', date('Y-m-d')) ?>">
+      </div>
+
+      <div class="col-md-5">
+        <label class="form-label">Supplier <span class="text-danger">*</span></label>
+        <div class="autocomplete-ghost-wrap">
+          <span id="supplier-ghost" class="autocomplete-ghost"></span>
+          <input type="text" name="supplier" id="supplier" class="form-control" list="suppliers" required
+                 value="<?= old('supplier') ?>" autocomplete="off" placeholder="Supplier name">
+        </div>
+        <datalist id="suppliers"></datalist>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">VAT / NVAT</label>
+        <?php $vv = $_POST['vat_nvat'] ?? ($entry['vat_nvat'] ?? 'VAT'); ?>
+        <select name="vat_nvat" id="vat_nvat" class="form-select">
+          <option value="VAT" <?= $vv==='VAT'?'selected':''; ?>>VAT</option>
+          <option value="NonVAT" <?= $vv==='NonVAT'?'selected':''; ?>>NonVAT</option>
+        </select>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label">Address <span class="text-danger">*</span></label>
+        <div class="autocomplete-ghost-wrap">
+          <span id="address-ghost" class="autocomplete-ghost"></span>
+          <input type="text" name="address" id="address" class="form-control" required
+                 value="<?= old('address') ?>" list="addresss" autocomplete="off" placeholder="Street / City / Province">
+        </div>
+        <datalist id="addresss"></datalist>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">TIN <span class="text-danger">*</span></label>
+        <input type="text" name="tin" id="tin" class="form-control" required
+               value="<?= old('tin') ?>" placeholder="###-###-###-###"
+               pattern="[\d\- ]{9,}" title="Numbers and dashes only">
+      </div>
+
+      <div class="col-md-9">
+        <label class="form-label">Description <span class="text-danger">*</span></label>
+        <textarea name="description" class="form-control" rows="4" required
+                  placeholder="What was purchased?" style="white-space: pre-wrap;"><?= old('description') ?></textarea>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label">Project Name <span class="text-danger">*</span></label>
+        <input type="text" name="project_name" id="project" class="form-control"
+               list="projects" required value="<?= old('project_name') ?>" autocomplete="off"
+               placeholder="Select or type a new project">
+        <datalist id="projects">
+          <?php foreach ($project_suggestions as $pname): ?>
+            <option value="<?= htmlspecialchars($pname) ?>"></option>
+          <?php endforeach; ?>
+        </datalist>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Net (helper) <span class="text-danger">*</span></label>
+        <input type="text" inputmode="decimal" id="net_view" name="net_view" class="form-control" required
+               value="<?=
+                 isset($_POST['net']) && $_POST['net'] !== ''
+                   ? number_format((float)$_POST['net'], 2)
+                   : old('net')
+               ?>"
+               placeholder="0.00">
+        <input type="hidden" name="net" id="net" value="<?= isset($_POST['net']) ? htmlspecialchars((string)$_POST['net']) : '' ?>">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">VATable</label>
+        <input type="text" id="vatable_view" class="form-control" readonly tabindex="-1"
+               value="<?= isset($_POST['vatable']) ? number_format((float)$_POST['vatable'], 2) : number_format((float)($entry['vatable'] ?? 0),2) ?>">
+        <input type="hidden" name="vatable" id="vatable" value="<?= isset($_POST['vatable']) ? htmlspecialchars((string)$_POST['vatable']) : htmlspecialchars((string)($entry['vatable'] ?? '0')) ?>">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">NonVAT</label>
+        <input type="text" id="non_vat_view" class="form-control" readonly tabindex="-1"
+               value="<?= isset($_POST['non_vat']) ? number_format((float)$_POST['non_vat'], 2) : number_format((float)($entry['non_vat'] ?? 0),2) ?>">
+        <input type="hidden" name="non_vat" id="non_vat" value="<?= isset($_POST['non_vat']) ? htmlspecialchars((string)$_POST['non_vat']) : htmlspecialchars((string)($entry['non_vat'] ?? '0')) ?>">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Input VAT</label>
+        <input type="text" id="input_vat_view" class="form-control" readonly value="<?= number_format((float)($entry['input_vat'] ?? 0),2) ?>">
+        <input type="hidden" name="input_vat" id="input_vat" value="<?= htmlspecialchars((string)($entry['input_vat'] ?? '0')) ?>">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Total</label>
+        <input type="text" id="total_view" class="form-control" readonly value="<?= number_format((float)($entry['total'] ?? 0),2) ?>">
+        <input type="hidden" name="total" id="total" value="<?= htmlspecialchars((string)($entry['total'] ?? '0')) ?>">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Freight & Handling</label>
+        <input type="number" step="0.01" name="freight_handling" id="freight_handling" class="form-control"
+               value="<?= old('freight_handling', '0') ?>">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Cash</label>
+        <input type="text" id="cash_view" class="form-control" readonly value="<?= number_format((float)($entry['cash'] ?? 0),2) ?>">
+        <input type="hidden" name="cash" id="cash" value="<?= htmlspecialchars((string)($entry['cash'] ?? '0')) ?>">
+      </div>
+
+      <div class="col-12">
+        <a class="btn btn-outline-secondary" data-bs-toggle="collapse" href="#optionalDetails" role="button" aria-expanded="false" aria-controls="optionalDetails">
+          Optional details
+        </a>
+      </div>
+
+      <div class="collapse" id="optionalDetails">
+        <div class="row g-3 mt-1">
+          <div class="col-md-3">
+            <label class="form-label">Ref. Page</label>
+            <input type="text" name="ref_page" class="form-control" value="<?= old('ref_page') ?>">
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Category</label>
+            <input type="text" name="category" class="form-control" list="categories" value="<?= old('category') ?>">
+            <datalist id="categories">
+              <?php foreach ($category_suggestions as $cat): ?>
+                <option value="<?= htmlspecialchars($cat) ?>"></option>
+              <?php endforeach; ?>
+            </datalist>
+          </div>
+
+          <div class="col-md-5">
+            <label class="form-label">Reference</label>
+            <input type="text" name="reference" class="form-control" value="<?= old('reference') ?>">
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">Account Title</label>
+            <input type="text" name="account_title" class="form-control" list="account_titles" value="<?= old('account_title') ?>">
+            <datalist id="account_titles">
+              <?php foreach ($account_title_suggestions as $at): ?>
+                <option value="<?= htmlspecialchars($at) ?>"></option>
+              <?php endforeach; ?>
+            </datalist>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Debit</label>
+            <input type="number" step="0.01" name="debit" class="form-control" value="<?= old('debit', '0') ?>">
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Credit</label>
+            <input type="number" step="0.01" name="credit" class="form-control" value="<?= old('credit', '0') ?>">
+          </div>
+
+          <div class="col-md-12">
+            <label class="form-label">Remarks</label>
+            <input type="text" name="remarks" class="form-control" value="<?= old('remarks') ?>">
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 d-flex gap-2">
+        <button class="btn btn-primary mt-2" type="submit">Save</button>
+        <button type="button" id="clearFormBtn" class="btn btn-outline-secondary mt-2">Clear</button>
+      </div>
+
+    </div>
+  </form>
+</div>
+
+<script src="assets/script.js"></script>
+
+<?php include "templates/footer.php"; ?>

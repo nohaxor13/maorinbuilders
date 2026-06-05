@@ -1,0 +1,150 @@
+/* assets/css/public.css - public marketing site */
+/* ✅ Updated to match Maorin Builders logo branding (green + gold) */
+/* ✅ Professional compact header + modern nav (keeps your classes) */
+/* ✅ No extra files */
+
+:root{
+  /* Brand palette (from logo) */
+  --mb-brand:#084316;        /* primary green */
+  --mb-brand-2:#063815;      /* deeper green */
+  --mb-accent:#E4CE19;       /* gold/yellow */
+  --mb-ink:#0b1220;          /* deep text */
+  --mb-muted:#5b677a;        /* muted text */
+  --mb-bg:#f6f8fb;           /* site background */
+  --mb-paper:#ffffff;        /* cards/header background */
+  --mb-border:rgba(15,23,42,.10);
+}
+
+body{color:var(--mb-ink);background:var(--mb-bg)}
+
+/* =========================
+   ✅ Brand Bar (compact + modern)
+   ========================= */
+.brandbar{
+  background: var(--mb-paper);
+  border-bottom: 1px solid rgba(0,0,0,.06);
+}
+.brandbar-inner{
+  padding: 8px 0;                 /* ✅ less height */
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+}
+.brandbar-link{
+  display:inline-flex;
+  align-items:center;
+  text-decoration:none;
+}
+.brand-logo{
+  height: 44px;                   /* ✅ compact */
+  width: auto;
+  max-width: 520px;               /* ✅ prevents banner stretch */
+  object-fit: contain;
+}
+
+/* =========================
+   ✅ Main Nav (professional + slim)
+   ========================= */
+.mainnav{
+  background: linear-gradient(180deg, var(--mb-brand), var(--mb-brand-2));
+  border-bottom: 1px solid rgba(0,0,0,.08);
+  box-shadow: 0 6px 18px rgba(2,6,23,.08);
+}
+.mainnav .container{
+  min-height: 52px;               /* ✅ slim nav height */
+}
+.mainnav .navbar-nav{
+  gap: 6px;                       /* ✅ tighter spacing */
+}
+.mainnav .nav-link{
+  color: rgba(255,255,255,.92) !important;
+  text-decoration:none;
+  font-weight: 700;
+  letter-spacing: .01em;
+  padding: 8px 12px !important;
+  border-radius: 999px;           /* ✅ modern pill style */
+  transition: transform .12s ease, background .12s ease, color .12s ease, box-shadow .12s ease;
+}
+.mainnav .nav-link:hover{
+  background: rgba(255,255,255,.12);
+  color:#fff !important;
+  transform: translateY(-1px);
+}
+.mainnav .nav-link.active,
+.mainnav .nav-link[aria-current="page"]{
+  background: rgba(228,206,25,.18);
+  box-shadow: inset 0 0 0 1px rgba(228,206,25,.40);
+}
+.mainnav .navbar-toggler{
+  border-color: rgba(255,255,255,.25);
+}
+.mainnav .navbar-toggler:focus{
+  box-shadow: 0 0 0 .2rem rgba(228,206,25,.20);
+}
+
+/* Mobile */
+@media (max-width: 576px){
+  .brandbar-inner{ padding: 6px 0; }
+  .brand-logo{ height: 38px; max-width: 100%; }
+  .mainnav .navbar-nav{ padding-top: 10px; }
+  .mainnav .nav-link{ width: 100%; border-radius: 12px; }
+}
+
+/* =========================
+   Existing site styles (preserved)
+   ========================= */
+.mb-hero{
+  background:linear-gradient(120deg, rgba(8,67,22,.95), rgba(11,18,32,.92));
+  color:#fff;
+}
+.mb-hero .lead{color:rgba(255,255,255,.85)}
+.mb-badge{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.18)}
+.mb-section-title{letter-spacing:.02em}
+.mb-muted{color:var(--mb-muted)}
+.mb-card-icon{
+  width:44px;height:44px;border-radius:12px;
+  display:grid;place-items:center;
+  background: rgba(228,206,25,.16); /* subtle gold tint */
+  border: 1px solid rgba(228,206,25,.22);
+}
+.mb-cta{
+  background:linear-gradient(120deg, rgba(228,206,25,.12), rgba(8,67,22,.06));
+  border:1px solid rgba(15,23,42,.08);
+}
+.mb-footer{color:rgba(255,255,255,.85)}
+.mb-portfolio-img{aspect-ratio: 4/3; object-fit: cover; width:100%; border-radius:14px}
+
+/* service cards */
+.mb-service-card{transition: transform .12s ease, box-shadow .12s ease}
+.mb-service-card:hover{
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(2,6,23,.10);
+}
+.mb-service-hero{
+  background:linear-gradient(120deg, rgba(228,206,25,.12), rgba(8,67,22,.06));
+  border:1px solid rgba(15,23,42,.08);
+}
+
+/* before/after slider */
+.mb-beforeafter{
+  position:relative; width:100%;
+  border-radius:14px; overflow:hidden;
+  aspect-ratio:4/3; background:#fff;
+  border:1px solid rgba(15,23,42,.08)
+}
+.mb-beforeafter .ba-img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
+.mb-beforeafter .ba-before-wrap{position:absolute; inset:0; width:50%; overflow:hidden}
+.mb-beforeafter .ba-range{position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:ew-resize}
+.mb-beforeafter .ba-line{
+  position:absolute; top:0; bottom:0; left:50%;
+  width:3px; background:rgba(255,255,255,.92);
+  box-shadow:0 0 0 1px rgba(15,23,42,.15)
+}
+.mb-beforeafter .ba-label{
+  position:absolute; top:12px; padding:6px 10px;
+  font-size:12px; border-radius:999px;
+  background:rgba(15,23,42,.72); color:#fff;
+  backdrop-filter: blur(3px)
+}
+.mb-beforeafter .ba-label-before{left:12px}
+.mb-beforeafter .ba-label-after{right:12px}

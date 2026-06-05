@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900">
+  <rect width="1200" height="900" fill="#f8fafc"/>
+  <rect x="60" y="60" width="1080" height="780" rx="28" ry="28" fill="#ffffff" stroke="#e2e8f0" stroke-width="6"/>
+  <rect x="60" y="60" width="1080" height="160" rx="28" ry="28" fill="#22c55e" opacity="0.12"/>
+  <text x="100" y="150" font-family="system-ui,Segoe UI,Roboto,Arial" font-size="64" font-weight="800" fill="#0f172a">P1 — AFTER</text>
+  <text x="100" y="220" font-family="system-ui,Segoe UI,Roboto,Arial" font-size="28" fill="#64748b">Replace this placeholder with real site photos</text>
+  <g opacity="0.9">
+    <rect x="100" y="300" width="1000" height="480" rx="22" ry="22" fill="#f1f5f9" stroke="#e2e8f0"/>
+    <path d="M140 740 L420 470 L610 620 L760 510 L1060 740" fill="none" stroke="#22c55e" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="320" cy="420" r="34" fill="#22c55e" opacity="0.5"/>
+    <circle cx="520" cy="520" r="24" fill="#0b4dbb" opacity="0.35"/>
+    <circle cx="850" cy="455" r="30" fill="#0f172a" opacity="0.25"/>
+  </g>
+</svg>

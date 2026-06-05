@@ -1,0 +1,12 @@
+{
+  "name": "maorinbuilders/purchases-io",
+  "type": "project",
+  "require": {
+    "phpoffice/phpspreadsheet": "^2.1"
+  },
+  "autoload": {
+    "psr-4": {
+      "PurchasesIO\\": "lib/"
+    }
+  }
+}
