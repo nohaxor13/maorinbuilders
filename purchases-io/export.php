@@ -5,7 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../helpers.php';
 redirect_if_not_logged_in();
-require_admin($pdo);
+require_permission($pdo, 'export_journal');
 
 use PurchasesIO\ExcelWriter;
 
