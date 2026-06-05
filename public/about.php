@@ -1,7 +1,8 @@
 <?php
 $company = require __DIR__ . '/data/company.php';
 $p = $company['profile'] ?? [];
-$title = 'About — ' . ($company['name'] ?? 'Maorin Builders');
+$licenseInfoModalId = 'licenseInfoModal';
+$title = 'About - ' . ($company['name'] ?? 'Maorin Builders');
 require __DIR__ . '/templates/header.php';
 ?>
 
@@ -81,12 +82,27 @@ require __DIR__ . '/templates/header.php';
             <table class="table table-sm align-middle mb-0">
               <tbody>
                 <?php foreach (($p['licenses'] ?? []) as $row): ?>
+                  <?php
+                    $licenseValue = trim((string)($row['value'] ?? ''));
+                    $isPlaceholder = $licenseValue !== '' && stripos($licenseValue, 'to be added') !== false;
+                  ?>
                   <tr>
                     <td class="mb-muted" style="width:55%">
                       <?= htmlspecialchars((string)($row['label'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
                     </td>
                     <td class="text-end fw-semibold">
-                      <?= htmlspecialchars((string)($row['value'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                      <?php if ($isPlaceholder): ?>
+                        <button
+                          type="button"
+                          class="btn btn-link p-0 fw-semibold text-decoration-none"
+                          data-bs-toggle="modal"
+                          data-bs-target="#<?= htmlspecialchars($licenseInfoModalId, ENT_QUOTES, 'UTF-8') ?>"
+                        >
+                          <?= htmlspecialchars($licenseValue, ENT_QUOTES, 'UTF-8') ?>
+                        </button>
+                      <?php else: ?>
+                        <?= htmlspecialchars($licenseValue, ENT_QUOTES, 'UTF-8') ?>
+                      <?php endif; ?>
                     </td>
                   </tr>
                 <?php endforeach; ?>
@@ -97,6 +113,25 @@ require __DIR__ . '/templates/header.php';
           <hr>
           <a class="btn btn-primary w-100" href="<?= htmlspecialchars(pub_url('/public/contact.php'), ENT_QUOTES, 'UTF-8') ?>">Request a Quote</a>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="<?= htmlspecialchars($licenseInfoModalId, ENT_QUOTES, 'UTF-8') ?>" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg rounded-4">
+      <div class="modal-header">
+        <h5 class="modal-title">Document details coming soon</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">These license and permit numbers are still being prepared for publication.</p>
+        <p class="mb-0 text-muted">Please contact Maorin Builders if you need the latest registration or permit details for a quotation or verification request.</p>
+      </div>
+      <div class="modal-footer">
+        <a class="btn btn-primary" href="<?= htmlspecialchars(pub_url('/public/contact.php'), ENT_QUOTES, 'UTF-8') ?>">Contact us</a>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>

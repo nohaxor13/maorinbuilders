@@ -28,7 +28,7 @@ if (is_client_logged_in()) {
 <body class="bg-light">
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
   <div class="container">
-    <a class="navbar-brand" href="index.php">Maorin Builders • Client Portal</a>
+    <a class="navbar-brand" href="../public/index.php">Maorin Builders • Client Portal</a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#cpNav">
       <span class="navbar-toggler-icon"></span>
     </button>
