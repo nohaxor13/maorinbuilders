@@ -198,7 +198,7 @@ td.col-desc > .desc-box{
 
       <tfoot id="journalFoot">
         <tr>
-          <td class="tfoot-label text-end" colspan="10">Page totals</td>
+          <td class="tfoot-label text-end" colspan="10">total</td>
           <td class="text-end fw-bold num" id="foot_input_vat">0.00</td>
           <td class="text-end fw-bold num" id="foot_vatable">0.00</td>
           <td class="text-end fw-bold num" id="foot_non_vat">0.00</td>
