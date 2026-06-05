@@ -36,7 +36,26 @@
   }
   function openExistingModal(id){ const el=document.getElementById(id); if(el&&window.bootstrap){ new bootstrap.Modal(el).show(); bindInside(el); } }
   function bindContent(){ bindInside(content); }
+
+  function bindEstimateTabs(scope){
+    scope.querySelectorAll('.professional-estimate-modal .estimate-subtabs [data-bs-toggle="pill"]').forEach(btn=>{
+      if(btn.dataset.tabFallbackBound) return;
+      btn.dataset.tabFallbackBound='1';
+      btn.addEventListener('click',()=>{
+        const modal=btn.closest('.professional-estimate-modal');
+        if(!modal) return;
+        modal.querySelectorAll('.estimate-subtabs .nav-link').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        const target=btn.getAttribute('data-bs-target');
+        modal.querySelectorAll('.tab-content > .tab-pane').forEach(p=>p.classList.remove('show','active'));
+        const pane=target ? modal.querySelector(target) : null;
+        if(pane) pane.classList.add('show','active');
+      });
+    });
+  }
+
   function bindInside(scope){
+    bindEstimateTabs(scope);
     scope.querySelectorAll('[data-workspace-open]').forEach(btn=>{ if(btn.dataset.bound) return; btn.dataset.bound='1'; btn.addEventListener('click',()=>openExistingModal(btn.getAttribute('data-workspace-open'))); });
     scope.querySelectorAll('form[data-spa-form]').forEach(form=>{ if(form.dataset.bound) return; form.dataset.bound='1'; form.addEventListener('submit',submitSpaForm); });
     scope.querySelectorAll('[data-confirm-action]').forEach(btn=>{ if(btn.dataset.bound) return; btn.dataset.bound='1'; btn.addEventListener('click',()=>deleteRecord(btn)); });

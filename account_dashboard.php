@@ -30,10 +30,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 }
 
-$stmt = $pdo->prepare("SELECT COUNT(*) AS entry_count FROM purchase_entries WHERE user_id=?");
+$stmt = $pdo->prepare("SELECT COUNT(*) AS entry_count, COALESCE(SUM(cash),0) AS total_cash FROM purchase_entries WHERE user_id=?");
 $stmt->execute([$userId]);
-$row = $stmt->fetch() ?: ['entry_count' => 0];
+$row = $stmt->fetch() ?: ['entry_count' => 0, 'total_cash' => 0];
 $count = (int)($row['entry_count'] ?? 0);
+$total_cash = (float)($row['total_cash'] ?? 0);
 
 $weekStmt = $pdo->prepare(
   "SELECT COUNT(*) FROM purchase_entries WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)"
@@ -153,6 +154,14 @@ include "templates/header.php";
             <div class="card-body">
               <div class="text-muted small">Your entries</div>
               <div class="display-6 fw-semibold"><?= (int)$count ?></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card border-0 bg-light h-100">
+            <div class="card-body">
+              <div class="text-muted small">Total cash</div>
+              <div class="display-6 fw-semibold"><?= number_format((float)$total_cash, 2) ?></div>
             </div>
           </div>
         </div>
