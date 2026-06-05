@@ -688,6 +688,7 @@ $rolePermRows = $pdo->query("SELECT role_slug, permission_key FROM role_permissi
 foreach ($rolePermRows as $row) {
   $rolePermissions[(string)$row['role_slug']][] = (string)$row['permission_key'];
 }
+$roleOptions = $roles;
 
 $title = 'Admin Dashboard';
 include __DIR__ . '/templates/header.php';
@@ -1125,10 +1126,9 @@ include __DIR__ . '/templates/header.php';
               <div class="col-md-6">
                 <label class="form-label">Role</label>
                 <select name="role" class="form-select">
-                  <option value="staff">Staff</option>
-                  <option value="admin">Admin</option>
-                  <option value="accounting">Accounting</option>
-                  <option value="warehouse">Warehouse</option>
+                  <?php foreach ($roleOptions as $roleOption): ?>
+                    <option value="<?= htmlspecialchars((string)$roleOption['slug'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string)$roleOption['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                  <?php endforeach; ?>
                 </select>
               </div>
               <div class="col-md-6"><label class="form-label">Job title</label><input type="text" name="job_title" class="form-control"></div>
@@ -1168,10 +1168,9 @@ include __DIR__ . '/templates/header.php';
               <div class="col-md-6">
                 <label class="form-label">Role</label>
                 <select name="role" id="edit_role" class="form-select">
-                  <option value="staff">Staff</option>
-                  <option value="admin">Admin</option>
-                  <option value="accounting">Accounting</option>
-                  <option value="warehouse">Warehouse</option>
+                  <?php foreach ($roleOptions as $roleOption): ?>
+                    <option value="<?= htmlspecialchars((string)$roleOption['slug'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string)$roleOption['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                  <?php endforeach; ?>
                 </select>
               </div>
               <div class="col-md-6"><label class="form-label">Job title</label><input type="text" name="job_title" id="edit_job_title" class="form-control"></div>
