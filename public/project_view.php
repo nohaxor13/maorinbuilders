@@ -114,8 +114,8 @@ $afterUrl = project_media_url($after, pub_url('/assets/img/projects/p1_after.svg
           </div>
           <input class="ba-range" type="range" min="0" max="100" value="50" aria-label="Before/After slider" data-ba-range>
           <div class="ba-line" data-ba-line></div>
-          <div class="ba-label ba-label-before">Before</div>
-          <div class="ba-label ba-label-after">After</div>
+          <button type="button" class="ba-label ba-label-before" data-full-image="<?= htmlspecialchars($beforeUrl, ENT_QUOTES, 'UTF-8') ?>" data-full-title="Before">Before</button>
+          <button type="button" class="ba-label ba-label-after" data-full-image="<?= htmlspecialchars($afterUrl, ENT_QUOTES, 'UTF-8') ?>" data-full-title="After">After</button>
         </div>
         <div class="small mb-muted mt-2">Drag the slider to compare before vs after.</div>
       <?php else: ?>
@@ -203,5 +203,45 @@ $afterUrl = project_media_url($after, pub_url('/assets/img/projects/p1_after.svg
     </div>
   </div>
 </div>
+
+<div class="modal fade" id="projectImageModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header">
+        <h5 class="modal-title" id="projectImageModalTitle">Image</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0">
+        <img id="projectImageModalImg" src="" alt="" class="w-100" style="max-height:80vh; object-fit:contain; background:#0b1220;">
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const modalEl = document.getElementById('projectImageModal');
+  const imgEl = document.getElementById('projectImageModalImg');
+  const titleEl = document.getElementById('projectImageModalTitle');
+  if (!modalEl || !imgEl || !titleEl || typeof bootstrap === 'undefined') return;
+
+  const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+  document.querySelectorAll('[data-full-image]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const src = btn.getAttribute('data-full-image') || '';
+      if (!src) return;
+      imgEl.src = src;
+      imgEl.alt = btn.getAttribute('data-full-title') || 'Project image';
+      titleEl.textContent = btn.getAttribute('data-full-title') || 'Image';
+      modal.show();
+    });
+  });
+
+  modalEl.addEventListener('hidden.bs.modal', () => {
+    imgEl.src = '';
+  });
+})();
+</script>
 
 <?php require __DIR__ . '/templates/footer.php'; ?>
