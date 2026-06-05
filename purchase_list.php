@@ -3,7 +3,8 @@ require "config.php";
 require "helpers.php";
 redirect_if_not_logged_in();
 require_permission($pdo, 'view_journal');
-$isAdmin = current_user_is_admin($pdo);
+$canExportJournal = current_user_can($pdo, 'export_journal');
+$canImportJournal = current_user_can($pdo, 'import_journal');
 
 include "templates/header.php";
 ?>
@@ -126,8 +127,10 @@ td.col-desc > .desc-box{
   <!-- Top toolbar -->
 <div class="journal-hero d-flex flex-wrap gap-2 align-items-center">
     <div class="d-flex gap-2">
-      <?php if ($isAdmin): ?>
+      <?php if ($canExportJournal): ?>
         <a class="btn btn-success btn-sm" id="exportXlsx" href="journal_export.php?search=&sort=date_desc">Export XLSX</a>
+      <?php endif; ?>
+      <?php if ($canImportJournal): ?>
         <a class="btn btn-outline-primary btn-sm" href="journal_import.php">Import XLSX</a>
       <?php endif; ?>
     </div>
