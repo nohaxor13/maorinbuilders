@@ -4,14 +4,14 @@
 // Update these placeholders with real details when ready.
 
 return [
-  'name' => 'Maorin Builders',
+  'name' => 'Maorin Builders & Supply',
   'tagline' => 'Construction • Renovation • Design & Build',
 
   // --- Company profile ---
   'profile' => [
     'history' => [
       'title' => 'Our story',
-      'text'  => 'Maorin Builders is a Philippine-based construction team focused on delivering safe, durable builds with clear scope, reliable timelines, and transparent costing.'
+      'text'  => 'Maorin Builders & Supplyis a Philippine-based construction team focused on delivering safe, durable builds with clear scope, reliable timelines, and transparent costing.'
     ],
     'mission' => 'Deliver quality construction work through disciplined planning, skilled execution, and honest communication.',
     'values' => [
@@ -44,18 +44,18 @@ return [
 
   // --- Contact ---
   'contact' => [
-    'phone' => '+63 9XX XXX XXXX',
-    'email' => 'hello@maorinbuilders.com',
-    'address' => 'Your office address here',
+    'phone' => '+63 9304547614',
+    'email' => 'maorinbuilders23@gmail.com',
+    'address' => 'B.9 L.1 Malong Vinta Street Emivill Subd. Sasa Davao City',
     'office_hours' => [
-      'Mon–Sat: 8:00 AM – 6:00 PM',
+      'Mon–Sat: 8:00 AM – 5:00 PM',
       'Sun: By appointment',
     ],
 
     // WhatsApp uses international format without spaces for best results
-    'whatsapp_number' => '639XXXXXXXXX',
+    'whatsapp_number' => '+63 9304547614',
     // Messenger: https://m.me/<page_or_username>
-    'messenger_username' => 'YourPageUsername',
+    'messenger_username' => 'MaorinBuilders',
 
     // Google Maps embed URL (replace with your pinned location)
     'map_embed_url' => 'https://www.google.com/maps?q=7.140785406644884,125.65552576134661&z=18&t=k&output=embed',
