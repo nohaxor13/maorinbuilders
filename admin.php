@@ -24,6 +24,11 @@ if (!is_dir($projectUploadDir)) {
   @mkdir($projectUploadDir, 0775, true);
 }
 
+$staffUploadDir = __DIR__ . '/storage/uploads/staff';
+if (!is_dir($staffUploadDir)) {
+  @mkdir($staffUploadDir, 0775, true);
+}
+
 if (!function_exists('admin_save_project_image')) {
   function admin_save_project_image(array $file, string $projectUploadDir, string $prefix): ?string {
     if (empty($file['name']) || !is_uploaded_file($file['tmp_name'])) {
@@ -48,6 +53,38 @@ if (!function_exists('admin_save_project_image')) {
 
 if (!function_exists('admin_delete_project_image_file')) {
   function admin_delete_project_image_file(?string $path): void {
+    if (!$path) return;
+    $abs = __DIR__ . '/' . ltrim($path, '/');
+    if (is_file($abs)) {
+      @unlink($abs);
+    }
+  }
+}
+
+if (!function_exists('admin_save_staff_photo')) {
+  function admin_save_staff_photo(array $file, string $staffUploadDir, string $prefix): ?string {
+    if (empty($file['name']) || !is_uploaded_file($file['tmp_name'])) {
+      return null;
+    }
+    $ext = strtolower(pathinfo((string)$file['name'], PATHINFO_EXTENSION));
+    if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true)) {
+      throw new RuntimeException('Unsupported image format. Use JPG, PNG, WEBP, or GIF.');
+    }
+    if (($file['size'] ?? 0) > 5 * 1024 * 1024) {
+      throw new RuntimeException('Photo too large. Max size is 5MB.');
+    }
+    $safePrefix = preg_replace('/[^a-z0-9_\-]+/i', '_', $prefix) ?: 'staff';
+    $fname = $safePrefix . '_' . date('Ymd_His') . '_' . substr(bin2hex(random_bytes(4)), 0, 8) . '.' . $ext;
+    $dest = $staffUploadDir . '/' . $fname;
+    if (!move_uploaded_file((string)$file['tmp_name'], $dest)) {
+      throw new RuntimeException('Upload failed. Please try again.');
+    }
+    return 'storage/uploads/staff/' . $fname;
+  }
+}
+
+if (!function_exists('admin_delete_staff_photo_file')) {
+  function admin_delete_staff_photo_file(?string $path): void {
     if (!$path) return;
     $abs = __DIR__ . '/' . ltrim($path, '/');
     if (is_file($abs)) {
@@ -274,6 +311,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $phone = trim((string)($_POST['phone'] ?? ''));
       $address = trim((string)($_POST['address'] ?? ''));
       $bio = trim((string)($_POST['bio'] ?? ''));
+      $photoPath = admin_save_staff_photo($_FILES['photo'] ?? [], $staffUploadDir, $email ?: $name);
 
       if ($name === '' || $email === '' || $password === '') {
         throw new RuntimeException('Name, email, and password are required.');
@@ -296,16 +334,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $roleStmt->execute([$userId, $role]);
 
       $profileStmt = $pdo->prepare(
-        "INSERT INTO staff_profiles (user_id, job_title, department, phone, address, bio)
-         VALUES (?, ?, ?, ?, ?, ?)
+        "INSERT INTO staff_profiles (user_id, job_title, department, phone, address, photo_path, bio)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            job_title = VALUES(job_title),
            department = VALUES(department),
            phone = VALUES(phone),
            address = VALUES(address),
+           photo_path = VALUES(photo_path),
            bio = VALUES(bio)"
       );
-      $profileStmt->execute([$userId, $jobTitle ?: null, $department ?: null, $phone ?: null, $address ?: null, $bio ?: null]);
+      $profileStmt->execute([$userId, $jobTitle ?: null, $department ?: null, $phone ?: null, $address ?: null, $photoPath, $bio ?: null]);
 
       log_staff_activity($pdo, $userId, 'account_created', 'Staff account created by admin.', $currentAdminId ?: null);
       log_staff_activity($pdo, $userId, 'role_assigned', 'Initial role set to ' . $role . '.', $currentAdminId ?: null);
@@ -337,17 +376,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $phone = trim((string)($_POST['phone'] ?? ''));
       $address = trim((string)($_POST['address'] ?? ''));
       $bio = trim((string)($_POST['bio'] ?? ''));
+      $removePhoto = !empty($_POST['remove_photo']);
+      $existingPhotoStmt = $pdo->prepare("SELECT photo_path FROM staff_profiles WHERE user_id = ? LIMIT 1");
+      $existingPhotoStmt->execute([$userId]);
+      $existingPhoto = (string)($existingPhotoStmt->fetchColumn() ?: '');
+      $uploadedPhoto = admin_save_staff_photo($_FILES['photo'] ?? [], $staffUploadDir, 'staff_' . $userId);
+      $photoPath = $uploadedPhoto ?: ($removePhoto ? null : ($existingPhoto !== '' ? $existingPhoto : null));
+      if ($uploadedPhoto) {
+        admin_delete_staff_photo_file($existingPhoto);
+      } elseif ($removePhoto) {
+        admin_delete_staff_photo_file($existingPhoto);
+      }
       $stmt = $pdo->prepare(
-        "INSERT INTO staff_profiles (user_id, job_title, department, phone, address, bio)
-         VALUES (?, ?, ?, ?, ?, ?)
+        "INSERT INTO staff_profiles (user_id, job_title, department, phone, address, photo_path, bio)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            job_title = VALUES(job_title),
            department = VALUES(department),
            phone = VALUES(phone),
            address = VALUES(address),
+           photo_path = VALUES(photo_path),
            bio = VALUES(bio)"
       );
-      $stmt->execute([$userId, $jobTitle ?: null, $department ?: null, $phone ?: null, $address ?: null, $bio ?: null]);
+      $stmt->execute([$userId, $jobTitle ?: null, $department ?: null, $phone ?: null, $address ?: null, $photoPath, $bio ?: null]);
       log_staff_activity($pdo, $userId, 'profile_updated', 'Staff profile updated by admin.', $currentAdminId ?: null);
       $flashSuccess = 'Profile saved.';
     } elseif ($action === 'update_staff') {
@@ -360,6 +411,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $phone = trim((string)($_POST['phone'] ?? ''));
       $address = trim((string)($_POST['address'] ?? ''));
       $bio = trim((string)($_POST['bio'] ?? ''));
+      $removePhoto = !empty($_POST['remove_photo']);
       if ($userId <= 0 || $name === '' || $email === '') {
         throw new RuntimeException('Staff name and email are required.');
       }
@@ -372,21 +424,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         throw new RuntimeException('Invalid role selected.');
       }
       $pdo->beginTransaction();
+      $existingPhotoStmt = $pdo->prepare("SELECT photo_path FROM staff_profiles WHERE user_id = ? LIMIT 1");
+      $existingPhotoStmt->execute([$userId]);
+      $existingPhoto = (string)($existingPhotoStmt->fetchColumn() ?: '');
+      $uploadedPhoto = admin_save_staff_photo($_FILES['photo'] ?? [], $staffUploadDir, $email ?: $name);
+      $photoPath = $uploadedPhoto ?: ($removePhoto ? null : ($existingPhoto !== '' ? $existingPhoto : null));
+      if ($uploadedPhoto) {
+        admin_delete_staff_photo_file($existingPhoto);
+      } elseif ($removePhoto) {
+        admin_delete_staff_photo_file($existingPhoto);
+      }
       $stmt = $pdo->prepare("UPDATE users SET name = ?, email = ? WHERE id = ?");
       $stmt->execute([$name, $email, $userId]);
       $roleStmt = $pdo->prepare("INSERT INTO user_roles (user_id, role) VALUES (?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role)");
       $roleStmt->execute([$userId, $role]);
       $profileStmt = $pdo->prepare(
-        "INSERT INTO staff_profiles (user_id, job_title, department, phone, address, bio)
-         VALUES (?, ?, ?, ?, ?, ?)
+        "INSERT INTO staff_profiles (user_id, job_title, department, phone, address, photo_path, bio)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            job_title = VALUES(job_title),
            department = VALUES(department),
            phone = VALUES(phone),
            address = VALUES(address),
+           photo_path = VALUES(photo_path),
            bio = VALUES(bio)"
       );
-      $profileStmt->execute([$userId, $jobTitle ?: null, $department ?: null, $phone ?: null, $address ?: null, $bio ?: null]);
+      $profileStmt->execute([$userId, $jobTitle ?: null, $department ?: null, $phone ?: null, $address ?: null, $photoPath, $bio ?: null]);
       log_staff_activity($pdo, $userId, 'staff_updated', 'Staff record updated by admin.', $currentAdminId ?: null);
       $pdo->commit();
       $flashSuccess = 'Staff details updated.';
@@ -628,7 +691,7 @@ $maintenanceRetryAfter = (int)site_setting_get($pdo, 'maintenance_retry_after', 
 $staffList = $pdo->query(
   "SELECT u.id, u.name, u.email, u.created_at,
           COALESCE(r.role, 'staff') AS role,
-          p.job_title, p.department, p.phone, p.address, p.bio, p.updated_at AS profile_updated_at
+          p.job_title, p.department, p.phone, p.address, p.photo_path, p.bio, p.updated_at AS profile_updated_at
    FROM users u
    LEFT JOIN user_roles r ON r.user_id = u.id
    LEFT JOIN staff_profiles p ON p.user_id = u.id
@@ -1007,8 +1070,27 @@ include __DIR__ . '/templates/header.php';
               <?php foreach ($staffList as $staff): ?>
                 <tr>
                   <td>
-                    <div class="fw-semibold"><?= htmlspecialchars((string)$staff['name'], ENT_QUOTES, 'UTF-8') ?></div>
-                    <div class="text-muted small"><?= htmlspecialchars((string)$staff['email'], ENT_QUOTES, 'UTF-8') ?></div>
+                    <?php
+                      $script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+                      $root = rtrim(dirname($script), '/');
+                      if ($root === '.' || $root === '/') {
+                        $root = '';
+                      }
+                      $staffPhotoUrl = !empty($staff['photo_path']) ? $root . '/' . ltrim((string)$staff['photo_path'], '/') : '';
+                    ?>
+                    <div class="d-flex align-items-center gap-2">
+                      <div class="rounded-circle bg-light border overflow-hidden d-flex align-items-center justify-content-center" style="width:42px;height:42px;flex:0 0 42px;">
+                        <?php if ($staffPhotoUrl !== ''): ?>
+                          <img src="<?= htmlspecialchars($staffPhotoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="" style="width:100%;height:100%;object-fit:cover;">
+                        <?php else: ?>
+                          <span class="fw-semibold text-secondary"><?= htmlspecialchars(strtoupper(substr((string)$staff['name'], 0, 1)), ENT_QUOTES, 'UTF-8') ?></span>
+                        <?php endif; ?>
+                      </div>
+                      <div>
+                        <div class="fw-semibold"><?= htmlspecialchars((string)$staff['name'], ENT_QUOTES, 'UTF-8') ?></div>
+                        <div class="text-muted small"><?= htmlspecialchars((string)$staff['email'], ENT_QUOTES, 'UTF-8') ?></div>
+                      </div>
+                    </div>
                   </td>
                   <td><span class="badge text-bg-light border"><?= htmlspecialchars(ucfirst((string)$staff['role']), ENT_QUOTES, 'UTF-8') ?></span></td>
                   <td>
@@ -1031,6 +1113,7 @@ include __DIR__ . '/templates/header.php';
                       data-department="<?= htmlspecialchars((string)($staff['department'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
                       data-phone="<?= htmlspecialchars((string)($staff['phone'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
                       data-address="<?= htmlspecialchars((string)($staff['address'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                      data-photo-path="<?= htmlspecialchars((string)($staff['photo_path'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
                       data-bio="<?= htmlspecialchars((string)($staff['bio'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
                     >Edit</button>
                     <button
@@ -1135,6 +1218,10 @@ include __DIR__ . '/templates/header.php';
               <div class="col-md-6"><label class="form-label">Department</label><input type="text" name="department" class="form-control"></div>
               <div class="col-md-6"><label class="form-label">Phone</label><input type="text" name="phone" class="form-control"></div>
               <div class="col-md-6"><label class="form-label">Address</label><input type="text" name="address" class="form-control"></div>
+              <div class="col-md-6">
+                <label class="form-label">Profile photo</label>
+                <input class="form-control" type="file" name="photo" accept="image/*">
+              </div>
               <div class="col-12"><label class="form-label">Bio</label><textarea name="bio" class="form-control" rows="3"></textarea></div>
             </div>
           </div>
@@ -1150,7 +1237,7 @@ include __DIR__ . '/templates/header.php';
   <div class="modal fade" id="staffEditModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
       <div class="modal-content border-0 shadow">
-        <form method="post">
+        <form method="post" enctype="multipart/form-data">
           <div class="modal-header">
             <div>
               <h5 class="modal-title mb-0">Edit staff</h5>
@@ -1177,6 +1264,14 @@ include __DIR__ . '/templates/header.php';
               <div class="col-md-6"><label class="form-label">Department</label><input type="text" name="department" id="edit_department" class="form-control"></div>
               <div class="col-md-6"><label class="form-label">Phone</label><input type="text" name="phone" id="edit_phone" class="form-control"></div>
               <div class="col-md-6"><label class="form-label">Address</label><input type="text" name="address" id="edit_address" class="form-control"></div>
+              <div class="col-md-6">
+                <label class="form-label">Profile photo</label>
+                <input class="form-control" type="file" name="photo" accept="image/*">
+                <div class="form-check mt-2">
+                  <input class="form-check-input" type="checkbox" value="1" id="edit_remove_photo" name="remove_photo">
+                  <label class="form-check-label" for="edit_remove_photo">Remove current photo</label>
+                </div>
+              </div>
               <div class="col-12"><label class="form-label">Bio</label><textarea name="bio" id="edit_bio" class="form-control" rows="4"></textarea></div>
             </div>
           </div>
@@ -1504,6 +1599,7 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('edit_phone').value = button.getAttribute('data-phone') || '';
     document.getElementById('edit_address').value = button.getAttribute('data-address') || '';
     document.getElementById('edit_bio').value = button.getAttribute('data-bio') || '';
+    document.getElementById('edit_remove_photo').checked = false;
     document.getElementById('staffEditSubtitle').textContent = `Editing ${button.getAttribute('data-name') || 'staff member'}`;
   });
 

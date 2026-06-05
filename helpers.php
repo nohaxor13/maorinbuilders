@@ -300,11 +300,21 @@ if (!function_exists('ensure_staff_profiles_table')) {
             department VARCHAR(120) NULL,
             phone VARCHAR(64) NULL,
             address VARCHAR(255) NULL,
+            photo_path VARCHAR(255) NULL,
             bio TEXT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        try {
+            $st = $pdo->query("SHOW COLUMNS FROM staff_profiles LIKE 'photo_path'");
+            $hasColumn = (bool)$st->fetchColumn();
+            if (!$hasColumn) {
+                $pdo->exec("ALTER TABLE staff_profiles ADD COLUMN photo_path VARCHAR(255) NULL AFTER address");
+            }
+        } catch (Throwable $e) {
+            // Ignore schema upgrade failures here; the app will still work on fresh installs.
+        }
     }
 }
 

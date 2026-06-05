@@ -49,7 +49,7 @@ $lastLoginStmt->execute([$userId]);
 $lastLogin = (string)($lastLoginStmt->fetchColumn() ?: '');
 
 $profileStmt = $pdo->prepare(
-  "SELECT u.name, u.email, u.created_at, r.role, p.job_title, p.department, p.phone, p.address, p.bio
+  "SELECT u.name, u.email, u.created_at, r.role, p.job_title, p.department, p.phone, p.address, p.photo_path, p.bio
    FROM users u
    LEFT JOIN user_roles r ON r.user_id = u.id
    LEFT JOIN staff_profiles p ON p.user_id = u.id
@@ -57,6 +57,17 @@ $profileStmt = $pdo->prepare(
 );
 $profileStmt->execute([$userId]);
 $profile = $profileStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+$profilePhoto = trim((string)($profile['photo_path'] ?? ''));
+$profilePhotoUrl = '';
+if ($profilePhoto !== '') {
+  $script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+  $root = rtrim(dirname($script), '/');
+  if ($root === '.' || $root === '/') {
+    $root = '';
+  }
+  $profilePhotoUrl = $root . '/' . ltrim($profilePhoto, '/');
+}
 
 $role = current_user_role($pdo);
 $recentEntries = $pdo->prepare(
@@ -133,10 +144,19 @@ include "templates/header.php";
   <div class="col-lg-8">
     <div class="card p-4 h-100">
       <div class="d-flex flex-wrap justify-content-between gap-3 align-items-start mb-3">
-        <div>
-          <div class="text-muted small text-uppercase fw-semibold">Account dashboard</div>
-          <h3 class="mb-1">Welcome, <?= htmlspecialchars((string)($profile['name'] ?? $_SESSION['name'] ?? 'User'), ENT_QUOTES, 'UTF-8') ?></h3>
-          <div class="text-muted">Your profile, activity, and journal usage in one place.</div>
+        <div class="d-flex align-items-center gap-3">
+          <div class="rounded-circle bg-primary-subtle d-flex align-items-center justify-content-center overflow-hidden" style="width:72px;height:72px;flex:0 0 72px;">
+            <?php if ($profilePhotoUrl !== ''): ?>
+              <img src="<?= htmlspecialchars($profilePhotoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Profile photo" style="width:100%;height:100%;object-fit:cover;">
+            <?php else: ?>
+              <span class="fw-bold text-primary" style="font-size:1.6rem;"><?= htmlspecialchars(strtoupper(substr((string)($profile['name'] ?? $_SESSION['name'] ?? 'U'), 0, 1)), ENT_QUOTES, 'UTF-8') ?></span>
+            <?php endif; ?>
+          </div>
+          <div>
+            <div class="text-muted small text-uppercase fw-semibold">Account dashboard</div>
+            <h3 class="mb-1">Welcome, <?= htmlspecialchars((string)($profile['name'] ?? $_SESSION['name'] ?? 'User'), ENT_QUOTES, 'UTF-8') ?></h3>
+            <div class="text-muted">Your profile, activity, and journal usage in one place.</div>
+          </div>
         </div>
         <span class="badge text-bg-primary align-self-start"><?= htmlspecialchars(ucfirst($role), ENT_QUOTES, 'UTF-8') ?></span>
       </div>
@@ -205,6 +225,19 @@ include "templates/header.php";
   <div class="col-lg-4">
     <div class="card p-4 h-100">
       <div class="card-header bg-white px-0 pt-0 fw-semibold">My profile</div>
+      <div class="d-flex align-items-center gap-3 mb-3">
+        <div class="rounded-circle bg-light border d-flex align-items-center justify-content-center overflow-hidden" style="width:84px;height:84px;flex:0 0 84px;">
+          <?php if ($profilePhotoUrl !== ''): ?>
+            <img src="<?= htmlspecialchars($profilePhotoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Profile photo" style="width:100%;height:100%;object-fit:cover;">
+          <?php else: ?>
+            <span class="fw-bold text-secondary" style="font-size:1.8rem;"><?= htmlspecialchars(strtoupper(substr((string)($profile['name'] ?? $_SESSION['name'] ?? 'U'), 0, 1)), ENT_QUOTES, 'UTF-8') ?></span>
+          <?php endif; ?>
+        </div>
+        <div class="small text-muted">
+          <div class="fw-semibold text-dark"><?= htmlspecialchars((string)($profile['name'] ?? $_SESSION['name'] ?? 'User'), ENT_QUOTES, 'UTF-8') ?></div>
+          <div><?= htmlspecialchars((string)($profile['job_title'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+        </div>
+      </div>
       <div class="small text-muted mb-3">
         <div><span class="fw-semibold">Email:</span> <?= htmlspecialchars((string)($profile['email'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
         <div><span class="fw-semibold">Joined:</span> <?= htmlspecialchars((string)($profile['created_at'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
