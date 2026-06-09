@@ -64,4 +64,70 @@
 @media(max-width:1200px){.attendance-compact-card{grid-template-columns:1fr;align-items:start}}
 @media(max-width:992px){.employee-resume-grid,.attendance-layout{grid-template-columns:1fr}.employee-photo-preview{width:140px;height:170px}.attendance-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.attendance-hero,.attendance-sheet-head{flex-direction:column}.attendance-rules{justify-content:flex-start}}
 @media(max-width:640px){.attendance-summary-grid{grid-template-columns:1fr}.attendance-calendar{gap:.4rem}.cal-cell{min-height:78px;padding:.55rem}.attendance-compact-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}}
+.attendance-pro-shell{gap:1.1rem}
+.attendance-topbar{display:grid;grid-template-columns:180px 1.1fr 1fr 1fr auto;gap:.85rem;align-items:center}
+.attendance-date-input.pro{height:46px;border-radius:14px}
+.attendance-segments{display:flex;align-items:center;padding:.25rem;border:1px solid #dbe7f3;border-radius:14px;background:#fff}
+.attendance-segment{flex:1;border:0;background:transparent;padding:.7rem .95rem;border-radius:11px;font-weight:800;color:#475569}
+.attendance-segment.active{background:#0f2748;color:#fff;box-shadow:0 10px 24px rgba(15,39,72,.18)}
+.attendance-filter-select,.attendance-settings-btn{height:46px;border-radius:14px}
+.attendance-settings-btn{padding:0 1rem;border:1px solid #dbe7f3;background:#fff;font-weight:700}
+.attendance-kpi-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:.85rem}
+.attendance-kpi-card{border:1px solid #e6edf6;border-radius:18px;background:#fff;padding:1rem 1rem 1rem 1.15rem;box-shadow:0 16px 30px rgba(15,23,42,.04)}
+.attendance-kpi-label{font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-bottom:.45rem}
+.attendance-kpi-value{font-size:2rem;font-weight:900;line-height:1;color:#0f172a}
+.attendance-kpi-sub{margin-top:.35rem;font-size:.78rem;color:#64748b}
+.attendance-kpi-card.present{box-shadow:inset 0 0 0 1px rgba(34,197,94,.08)}
+.attendance-kpi-card.late{box-shadow:inset 0 0 0 1px rgba(245,158,11,.08)}
+.attendance-kpi-card.absent{box-shadow:inset 0 0 0 1px rgba(239,68,68,.08)}
+.attendance-kpi-card.half{box-shadow:inset 0 0 0 1px rgba(139,92,246,.08)}
+.attendance-kpi-card.overtime{box-shadow:inset 0 0 0 1px rgba(59,130,246,.08)}
+.attendance-kpi-card.payroll{box-shadow:inset 0 0 0 1px rgba(16,185,129,.08)}
+.attendance-main-grid{display:grid;grid-template-columns:minmax(360px,1fr) minmax(0,1.6fr);gap:1rem}
+.attendance-card-title{font-size:1.08rem;font-weight:900;color:#0f172a}
+.attendance-card-head{display:flex;justify-content:space-between;align-items:center;margin:.85rem 0}
+.attendance-month-nav{font-weight:900;color:#0f172a}
+.attendance-legend{display:flex;gap:1rem;flex-wrap:wrap;font-size:.8rem;color:#475569;margin-bottom:.9rem}
+.attendance-legend span{position:relative;padding-left:1rem}
+.attendance-legend span::before{content:'';position:absolute;left:0;top:.32rem;width:8px;height:8px;border-radius:999px;background:#cbd5e1}
+.attendance-legend .present::before{background:#22c55e}.attendance-legend .late::before{background:#f59e0b}.attendance-legend .absent::before{background:#ef4444}.attendance-legend .overtime::before{background:#2563eb}.attendance-legend .rest::before{background:#94a3b8}
+.attendance-calendar.pro{gap:0;border-top:1px solid #edf2f7;border-left:1px solid #edf2f7}
+.cal-cell.pro{min-height:86px;border-radius:0;border-top:0;border-left:0;border-right:1px solid #edf2f7;border-bottom:1px solid #edf2f7;background:#fff;box-shadow:none;transform:none}
+.cal-cell.pro.active{background:#0f2748;color:#fff;border-color:#e2e8f0;box-shadow:none}
+.cal-dots{display:flex;gap:.22rem;flex-wrap:wrap;margin-top:auto}
+.cal-dots i{width:7px;height:7px;border-radius:999px;display:block;background:#cbd5e1}
+.cal-dots .present{background:#22c55e}.cal-dots .late{background:#f59e0b}.cal-dots .absent{background:#ef4444}.cal-dots .overtime{background:#2563eb}.cal-dots .rest{background:#94a3b8}
+.attendance-mini-stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.65rem;margin-top:1rem}
+.attendance-mini-stats div{border:1px solid #eef2f7;border-radius:14px;background:#fbfdff;padding:.7rem .8rem}
+.attendance-mini-stats strong{display:block;font-size:1.1rem;color:#0f172a}
+.attendance-mini-stats span{font-size:.74rem;color:#64748b}
+.attendance-sheet-pro .attendance-sheet-actions{display:flex;gap:.55rem;align-items:center;flex-wrap:wrap}
+.attendance-sheet-title-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1rem}
+.attendance-search-input{width:210px;max-width:100%;height:40px;border-radius:12px}
+.attendance-sheet-table{display:grid;gap:.45rem}
+.attendance-sheet-headline,.attendance-row-pro{display:grid;grid-template-columns:minmax(240px,1.3fr) minmax(170px,.9fr) 88px 88px 110px 70px 80px 130px;gap:.75rem;align-items:center}
+.attendance-sheet-headline{padding:0 .25rem .5rem;border-bottom:1px solid #edf2f7;font-size:.73rem;font-weight:900;text-transform:uppercase;letter-spacing:.05em;color:#64748b}
+.attendance-row-pro{padding:.82rem .35rem;border-bottom:1px solid #edf2f7}
+.employee-col{display:flex;align-items:center;gap:.7rem;min-width:0}
+.attendance-avatar.pro{width:38px;height:38px;border-radius:999px;background:linear-gradient(135deg,#dbeafe,#bfdbfe);color:#0f2748;font-size:.78rem}
+.employee-code{font-size:.69rem;font-weight:800;color:#64748b}
+.dept-col,.time-col,.late-col,.ot-col{font-size:.86rem;color:#0f172a}
+.time-col{font-weight:800;color:#047857}
+.action-col{display:flex;gap:.35rem;justify-content:flex-start}
+.attendance-icon-btn{border:1px solid #dbe7f3;background:#fff;color:#0f2748;border-radius:10px;padding:.42rem .55rem;font-size:.74rem;font-weight:900}
+.attendance-icon-btn.quick.present.active{background:#dcfce7;border-color:#86efac;color:#166534}
+.attendance-icon-btn.quick.late.active{background:#fef3c7;border-color:#fcd34d;color:#92400e}
+.attendance-icon-btn.quick.absent.active{background:#fee2e2;border-color:#fca5a5;color:#991b1b}
+.attendance-footer-grid{display:grid;grid-template-columns:1.2fr 1.6fr .9fr;gap:1rem}
+.attendance-footer-card{min-height:146px}
+.attendance-settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:.55rem;font-size:.86rem;margin-top:.85rem}
+.attendance-settings-grid span{display:block;color:#64748b;font-size:.73rem}
+.attendance-quick-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem;margin-top:.95rem}
+.attendance-quick-summary div{border-left:1px solid #eef2f7;padding-left:.85rem}
+.attendance-quick-summary div:first-child{border-left:0;padding-left:0}
+.attendance-quick-summary span{display:block;font-size:.74rem;color:#64748b}
+.attendance-quick-summary strong{display:block;font-size:1.35rem;color:#0f172a}
+@media(max-width:1280px){.attendance-kpi-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.attendance-sheet-headline,.attendance-row-pro{grid-template-columns:minmax(240px,1.3fr) minmax(170px,.9fr) 88px 88px 110px 70px 80px 130px;overflow-x:auto}.attendance-sheet-table{overflow:auto}.attendance-footer-grid{grid-template-columns:1fr}}
+@media(max-width:1024px){.attendance-topbar{grid-template-columns:1fr 1fr}.attendance-segments,.attendance-filter-select,.attendance-settings-btn,.attendance-date-wrap{grid-column:auto}.attendance-main-grid{grid-template-columns:1fr}.attendance-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.attendance-sheet-title-row{flex-direction:column;align-items:flex-start}.attendance-sheet-pro .attendance-sheet-actions{width:100%}.attendance-search-input{width:100%}.attendance-mini-stats,.attendance-quick-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:680px){.attendance-topbar,.attendance-kpi-grid,.attendance-mini-stats,.attendance-quick-summary{grid-template-columns:1fr}.attendance-sheet-headline{display:none}.attendance-row-pro{grid-template-columns:1fr 1fr}.employee-col,.dept-col{grid-column:1/-1}.action-col{grid-column:1/-1}}
 @media print{body *{visibility:hidden}.employee-view-print,.employee-view-print *{visibility:visible}.employee-view-print{position:absolute;left:0;top:0;width:100%;background:#fff}.modal,.modal-dialog,.modal-content,.modal-body{position:static!important;display:block!important;overflow:visible!important;box-shadow:none!important}.modal-header,.modal-footer,.btn{display:none!important}}

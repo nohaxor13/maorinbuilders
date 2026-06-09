@@ -15,6 +15,11 @@ if (!function_exists('is_logged_in')) {
 
     <!-- App CSS -->
     <link rel="stylesheet" href="assets/css/app.css">
+    <?php if (!empty($extraStylesheets) && is_array($extraStylesheets)): ?>
+      <?php foreach ($extraStylesheets as $href): ?>
+        <link rel="stylesheet" href="<?= htmlspecialchars((string)$href, ENT_QUOTES, 'UTF-8') ?>">
+      <?php endforeach; ?>
+    <?php endif; ?>
     <style>
       .app-navbar {
         box-shadow: 0 10px 28px rgba(15, 23, 42, 0.18);
@@ -114,4 +119,5 @@ if (!function_exists('is_logged_in')) {
       </div>
     </nav>
 
-    <div class="container py-3">
+    <?php $pageContainerClass = isset($pageContainerClass) && is_string($pageContainerClass) && $pageContainerClass !== '' ? $pageContainerClass : 'container'; ?>
+    <div class="<?= htmlspecialchars($pageContainerClass, ENT_QUOTES, 'UTF-8') ?> py-3">

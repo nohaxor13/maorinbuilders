@@ -5,6 +5,8 @@ redirect_if_not_logged_in();
 ensure_maorin_workspace_tables($pdo);
 mb_require_any_permission($pdo, ['view_projects','view_estimates','view_proposals','view_finance','view_hr','view_inventory','view_documents','view_reports']);
 $title = 'Workspace';
+$extraStylesheets = ['assets/css/workspace.css'];
+$pageContainerClass = 'container-fluid px-3 px-lg-4 px-xxl-5';
 include __DIR__ . '/templates/header.php';
 $role = current_user_role($pdo);
 $name = $_SESSION['name'] ?? 'User';

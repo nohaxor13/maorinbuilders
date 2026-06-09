@@ -203,90 +203,178 @@ function ws_render_employees(PDO $pdo,string $q=''): void { require_permission($
 <ul class="nav nav-pills mb-3 employee-category-tabs"><li class="nav-item"><button class="nav-link active" data-emp-cat="office" type="button">Office Employees</button></li><li class="nav-item"><button class="nav-link" data-emp-cat="field" type="button">Field Workers</button></li></ul>
 <?php foreach(['office'=>$office,'field'=>$field] as $cat=>$list): ?><div class="employee-cat-pane <?= $cat==='office'?'active':''?>" data-emp-pane="<?=$cat?>"><div class="table-responsive workspace-table-wrap"><table class="table table-hover workspace-table"><thead><tr><th>Employee</th><th>Job / Department</th><th>Rate</th><th>Status</th><th>Contact</th><th class="text-end">Actions</th></tr></thead><tbody><?php foreach($list as $r): ?><tr><td><div class="d-flex align-items-center gap-2"><div class="employee-thumb"><?php if(!empty($r['photo_path'])):?><img src="<?=ws_h($r['photo_path'])?>" alt="photo" style="width:42px;height:42px;max-width:42px;max-height:42px;min-width:42px;min-height:42px;display:block;object-fit:cover;object-position:center;"><?php endif;?></div><div><strong><?=ws_h($r['full_name'])?></strong><div class="text-muted small"><?=ws_h($r['employee_code'])?></div></div></div></td><td><?=ws_h($r['job_title_name'] ?: $r['job_title'])?><div class="text-muted small"><?=ws_h($r['department_name'] ?: $r['department'])?></div></td><td><?=ws_money($r['salary_rate'] ?: $r['daily_rate'])?><div class="text-muted small"><?=ws_h($r['rate_type']??'daily')?></div></td><td><span class="badge text-bg-light border"><?=ws_h($r['status'])?></span></td><td><?=ws_h($r['phone'])?><div class="text-muted small"><?=ws_h($r['email'])?></div></td><td class="text-end"><button class="btn btn-sm btn-outline-secondary" data-ws-view="employees" data-id="<?= (int)$r['id']?>">View</button> <?php if($can): ?><button class="btn btn-sm btn-outline-primary" data-ws-edit="employees" data-id="<?= (int)$r['id']?>">Edit</button> <button class="btn btn-sm btn-outline-danger" data-confirm-action="Delete employee?" data-id="<?= (int)$r['id']?>">Delete</button><?php endif;?></td></tr><?php endforeach; if(!$list): ?><tr><td colspan="6" class="text-center text-muted py-4">No <?=ws_h($cat)?> employees yet.</td></tr><?php endif;?></tbody></table></div></div><?php endforeach; ?><?php if($can) ws_render_employee_modal($pdo); }
 
-function ws_render_attendance(PDO $pdo,string $q=''): void { require_permission($pdo,'view_hr'); $can=current_user_can($pdo,'manage_attendance'); $date=$_GET['date'] ?? date('Y-m-d'); if(!preg_match('/^\d{4}-\d{2}-\d{2}$/',$date)) $date=date('Y-m-d'); $settings=$pdo->query("SELECT * FROM mb_attendance_settings WHERE id=1")->fetch(PDO::FETCH_ASSOC); $emps=$pdo->query("SELECT id,employee_code,full_name,category,salary_rate,daily_rate FROM mb_employees WHERE status IN ('active','probationary') ORDER BY category,full_name")->fetchAll(PDO::FETCH_ASSOC); $att=[]; $s=$pdo->prepare("SELECT * FROM mb_attendance WHERE attendance_date=?"); $s->execute([$date]); foreach($s->fetchAll(PDO::FETCH_ASSOC) as $a){$att[$a['employee_id']]=$a;} $month=substr($date,0,7); $first=new DateTime($month.'-01'); $days=(int)$first->format('t'); $startDow=(int)$first->format('w'); $counts=[]; $s=$pdo->prepare("SELECT attendance_date,status,COUNT(*) c FROM mb_attendance WHERE attendance_date BETWEEN ? AND ? GROUP BY attendance_date,status"); $s->execute([$month.'-01',$month.'-'.$days]); foreach($s as $r){$counts[$r['attendance_date']][$r['status']]=$r['c'];} $dayCounts=$counts[$date]??[]; $presentCount=(int)(($dayCounts['present']??0)+($dayCounts['late']??0)); $lateCount=(int)($dayCounts['late']??0); $absentCount=(int)($dayCounts['absent']??0); $halfDayCount=(int)($dayCounts['half_day']??0); ?>
-<div class="attendance-shell">
-  <div class="attendance-hero mb-3">
-    <div>
-      <div class="attendance-kicker">People Operations</div>
-      <h5 class="mb-1">Attendance Control</h5>
-      <div class="text-muted small">Compact one-click attendance with quick status capture and a details modal only when you need exceptions.</div>
+function ws_render_attendance(PDO $pdo,string $q=''): void {
+  require_permission($pdo,'view_hr');
+  $can=current_user_can($pdo,'manage_attendance');
+  $date=$_GET['date'] ?? date('Y-m-d');
+  if(!preg_match('/^\d{4}-\d{2}-\d{2}$/',$date)) $date=date('Y-m-d');
+  $settings=$pdo->query("SELECT * FROM mb_attendance_settings WHERE id=1")->fetch(PDO::FETCH_ASSOC);
+  $emps=$pdo->query("
+    SELECT e.id,e.employee_code,e.full_name,e.category,e.salary_rate,e.daily_rate,
+           COALESCE(d.name,'Unassigned') department_name,
+           COALESCE(NULLIF(TRIM(e.department),''), d.name, CASE WHEN e.category='field' THEN 'Field Team' ELSE 'Head Office' END) site_name
+    FROM mb_employees e
+    LEFT JOIN mb_departments d ON d.id=e.department_id
+    WHERE e.status IN ('active','probationary')
+    ORDER BY e.category,e.full_name
+  ")->fetchAll(PDO::FETCH_ASSOC);
+  $att=[];
+  $s=$pdo->prepare("SELECT * FROM mb_attendance WHERE attendance_date=?");
+  $s->execute([$date]);
+  foreach($s->fetchAll(PDO::FETCH_ASSOC) as $a){ $att[$a['employee_id']]=$a; }
+  $month=substr($date,0,7);
+  $first=new DateTime($month.'-01');
+  $days=(int)$first->format('t');
+  $startDow=(int)$first->format('w');
+  $counts=[];
+  $s=$pdo->prepare("SELECT attendance_date,status,COUNT(*) c FROM mb_attendance WHERE attendance_date BETWEEN ? AND ? GROUP BY attendance_date,status");
+  $s->execute([$month.'-01',$month.'-'.$days]);
+  foreach($s as $r){ $counts[$r['attendance_date']][$r['status']]=$r['c']; }
+  $dayCounts=$counts[$date]??[];
+  $presentCount=(int)($dayCounts['present']??0);
+  $lateCount=(int)($dayCounts['late']??0);
+  $absentCount=(int)($dayCounts['absent']??0);
+  $halfDayCount=(int)($dayCounts['half_day']??0);
+  $overtimeEmployees=(int)($dayCounts['overtime']??0);
+  $payrollImpact=0.0;
+  $monthlyPresent=$monthlyLate=$monthlyAbsent=$monthlyOvertimeDays=0;
+  foreach($counts as $bucket){
+    $monthlyPresent+=(int)(($bucket['present']??0)+($bucket['half_day']??0));
+    $monthlyLate+=(int)($bucket['late']??0);
+    $monthlyAbsent+=(int)($bucket['absent']??0);
+    if(!empty($bucket['overtime'])) $monthlyOvertimeDays+=(int)$bucket['overtime'];
+  }
+  foreach($emps as $e){
+    $row=$att[$e['id']]??[];
+    $rate=(float)($e['salary_rate'] ?: $e['daily_rate']);
+    $payrollImpact += $rate * (['present'=>1,'late'=>1,'half_day'=>0.5,'leave'=>1,'rest_day'=>0,'absent'=>0][(string)($row['status']??'present')] ?? 1);
+  }
+  $departments=[];
+  $sites=[];
+  foreach($emps as $e){ $departments[(string)$e['department_name']]=(string)$e['department_name']; $sites[(string)$e['site_name']]=(string)$e['site_name']; }
+  ?>
+<div class="attendance-shell attendance-pro-shell">
+  <div class="attendance-topbar">
+    <div class="attendance-date-wrap">
+      <input class="form-control attendance-date-input pro" type="date" value="<?=ws_h($date)?>" data-attendance-date>
     </div>
-    <div class="d-flex gap-2 align-items-center">
-      <input class="form-control attendance-date-input" type="date" value="<?=ws_h($date)?>" data-attendance-date>
-      <button class="btn btn-outline-primary btn-sm" data-workspace-open="attendanceSettingsModal">Settings</button>
+    <div class="attendance-segments" data-att-category-tabs>
+      <button type="button" class="attendance-segment active" data-att-category="office">Office Staff</button>
+      <button type="button" class="attendance-segment" data-att-category="field">Field Workers</button>
+    </div>
+    <select class="form-select attendance-filter-select" data-att-filter="department">
+      <option value="">All Departments</option>
+      <?php foreach($departments as $department): ?><option value="<?=ws_h($department)?>"><?=ws_h($department)?></option><?php endforeach; ?>
+    </select>
+    <select class="form-select attendance-filter-select" data-att-filter="site">
+      <option value="">All Project Sites</option>
+      <?php foreach($sites as $site): ?><option value="<?=ws_h($site)?>"><?=ws_h($site)?></option><?php endforeach; ?>
+    </select>
+    <button class="btn btn-light attendance-settings-btn" data-workspace-open="attendanceSettingsModal">Settings</button>
+  </div>
+
+  <div class="attendance-kpi-grid">
+    <div class="attendance-kpi-card present">
+      <div class="attendance-kpi-label">Present Today</div>
+      <div class="attendance-kpi-value"><?=$presentCount?></div>
+      <div class="attendance-kpi-sub"><?=count($emps) ? round(($presentCount/max(1,count($emps)))*100) : 0?>% of total</div>
+    </div>
+    <div class="attendance-kpi-card late">
+      <div class="attendance-kpi-label">Late Today</div>
+      <div class="attendance-kpi-value"><?=$lateCount?></div>
+      <div class="attendance-kpi-sub">Needs quick review</div>
+    </div>
+    <div class="attendance-kpi-card absent">
+      <div class="attendance-kpi-label">Absent Today</div>
+      <div class="attendance-kpi-value"><?=$absentCount?></div>
+      <div class="attendance-kpi-sub">Follow-up required</div>
+    </div>
+    <div class="attendance-kpi-card half">
+      <div class="attendance-kpi-label">Half Day</div>
+      <div class="attendance-kpi-value"><?=$halfDayCount?></div>
+      <div class="attendance-kpi-sub">Partial attendance</div>
+    </div>
+    <div class="attendance-kpi-card overtime">
+      <div class="attendance-kpi-label">Overtime Hours</div>
+      <div class="attendance-kpi-value"><?=number_format((float)$overtimeEmployees,1)?></div>
+      <div class="attendance-kpi-sub">Current day markers</div>
+    </div>
+    <div class="attendance-kpi-card payroll">
+      <div class="attendance-kpi-label">Payroll Impact</div>
+      <div class="attendance-kpi-value">₱ <?=number_format($payrollImpact,0)?></div>
+      <div class="attendance-kpi-sub">Estimated for this period</div>
     </div>
   </div>
 
-  <div class="attendance-summary-grid mb-3">
-    <div class="workspace-mini-card attendance-summary-card">
-      <span>Present / Late</span>
-      <b><?=$presentCount?></b>
-    </div>
-    <div class="workspace-mini-card attendance-summary-card">
-      <span>Late Today</span>
-      <b><?=$lateCount?></b>
-    </div>
-    <div class="workspace-mini-card attendance-summary-card <?= $absentCount ? 'danger' : '' ?>">
-      <span>Absent</span>
-      <b><?=$absentCount?></b>
-    </div>
-    <div class="workspace-mini-card attendance-summary-card">
-      <span>Half Day</span>
-      <b><?=$halfDayCount?></b>
-    </div>
-  </div>
-
-  <div class="attendance-layout">
-    <div class="workspace-section-card attendance-calendar-card">
-      <div class="attendance-calendar-head">
-        <div>
-          <div class="attendance-calendar-month"><?=date('F Y',strtotime($date))?></div>
-          <div class="text-muted small">Tap a day to switch the board.</div>
-        </div>
+  <div class="attendance-main-grid">
+    <section class="workspace-section-card attendance-month-card">
+      <div class="attendance-card-title">Monthly Attendance Calendar</div>
+      <div class="attendance-card-head">
+        <div class="attendance-month-nav"><?=date('F Y',strtotime($date))?></div>
+        <button type="button" class="btn btn-light btn-sm" data-att-today>Today</button>
       </div>
-      <div class="attendance-calendar">
+      <div class="attendance-legend">
+        <span class="present">Present</span>
+        <span class="late">Late</span>
+        <span class="absent">Absent</span>
+        <span class="overtime">Overtime</span>
+        <span class="rest">Rest Day</span>
+      </div>
+      <div class="attendance-calendar pro">
         <?php foreach(['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as $d):?><div class="cal-head"><?=$d?></div><?php endforeach; ?>
-        <?php for($i=0;$i<$startDow;$i++) echo '<div class="cal-cell muted"></div>'; ?>
-        <?php for($d=1;$d<=$days;$d++): $dt=$month.'-'.str_pad((string)$d,2,'0',STR_PAD_LEFT); $c=$counts[$dt]??[]; $dayPresent=(int)(($c['present']??0)+($c['late']??0)); $dayLate=(int)($c['late']??0); $dayAbsent=(int)($c['absent']??0); ?>
-          <button type="button" class="cal-cell <?= $dt===$date?'active':''?>" data-att-date="<?=$dt?>">
+        <?php for($i=0;$i<$startDow;$i++) echo '<div class="cal-cell muted pro"></div>'; ?>
+        <?php for($d=1;$d<=$days;$d++): $dt=$month.'-'.str_pad((string)$d,2,'0',STR_PAD_LEFT); $c=$counts[$dt]??[]; ?>
+          <button type="button" class="cal-cell pro <?= $dt===$date?'active':''?>" data-att-date="<?=$dt?>">
             <span class="cal-day"><?=$d?></span>
-            <span class="cal-stats">
-              <span>P <?=$dayPresent?></span>
-              <span>L <?=$dayLate?></span>
-              <span>A <?=$dayAbsent?></span>
+            <span class="cal-dots">
+              <?php if(($c['present']??0)>0): ?><i class="present"></i><?php endif; ?>
+              <?php if(($c['late']??0)>0): ?><i class="late"></i><?php endif; ?>
+              <?php if(($c['absent']??0)>0): ?><i class="absent"></i><?php endif; ?>
+              <?php if(($c['overtime']??0)>0): ?><i class="overtime"></i><?php endif; ?>
+              <?php if(($c['rest_day']??0)>0): ?><i class="rest"></i><?php endif; ?>
             </span>
           </button>
         <?php endfor; ?>
       </div>
-    </div>
+      <div class="attendance-mini-stats">
+        <div><strong><?=$days?></strong><span>Total Work Days</span></div>
+        <div><strong><?=$monthlyPresent?></strong><span>Present Days</span></div>
+        <div><strong><?=$monthlyLate?></strong><span>Late Days</span></div>
+        <div><strong><?=$monthlyAbsent?></strong><span>Absent Days</span></div>
+        <div><strong><?=$monthlyOvertimeDays?></strong><span>Overtime Days</span></div>
+      </div>
+    </section>
 
-    <div class="workspace-section-card attendance-sheet">
+    <section class="workspace-section-card attendance-sheet-pro">
       <form data-spa-form data-attendance-board data-start="<?=ws_h(substr((string)$settings['work_start'],0,5))?>" data-end="<?=ws_h(substr((string)$settings['work_end'],0,5))?>" data-grace="<?= (int)($settings['late_grace_minutes'] ?? 0) ?>">
         <input type="hidden" name="module" value="attendance">
         <input type="hidden" name="action" value="bulk_save">
         <input type="hidden" name="attendance_date" value="<?=ws_h($date)?>">
-
-        <div class="attendance-sheet-head">
-          <div>
-            <strong>Daily Sheet</strong>
-            <div class="text-muted small"><?=date('M d, Y',strtotime($date))?></div>
-          </div>
-          <div class="attendance-rules">
-            <span>Start <?=ws_h($settings['work_start'])?></span>
-            <span>Grace <?=ws_h($settings['late_grace_minutes'])?> min</span>
-            <span>OT after <?=ws_h($settings['overtime_after_hours'])?> hrs</span>
+        <div class="attendance-sheet-title-row">
+          <div class="attendance-card-title">Daily Attendance Sheet - <?=date('M d, Y (l)',strtotime($date))?></div>
+          <div class="attendance-sheet-actions">
+            <input class="form-control attendance-search-input" placeholder="Search employee..." data-att-search>
+            <button type="button" class="btn btn-primary btn-sm" data-att-bulk="present">Mark All Present</button>
+            <button type="button" class="btn btn-outline-danger btn-sm" data-att-bulk="clear">Clear Day</button>
+            <button type="button" class="btn btn-light btn-sm">Export Payroll</button>
+            <?php if($can): ?><button class="btn btn-dark btn-sm">Save Attendance</button><?php endif; ?>
           </div>
         </div>
 
-        <div class="attendance-toolbar mb-3">
-          <button type="button" class="btn btn-primary btn-sm" data-att-bulk="present">Mark All Present</button>
-          <button type="button" class="btn btn-outline-secondary btn-sm" data-att-bulk="clear">Clear Day</button>
-          <div class="attendance-toolbar-note">One click sets defaults. Use `Details` only for time changes, OT, or notes.</div>
-        </div>
+        <div class="attendance-sheet-table">
+          <div class="attendance-sheet-headline">
+            <span>Employee</span>
+            <span>Department / Site</span>
+            <span>Time In</span>
+            <span>Time Out</span>
+            <span>Status</span>
+            <span>Late</span>
+            <span>OT Hours</span>
+            <span>Actions</span>
+          </div>
 
-        <div class="attendance-compact-list">
-          <?php foreach($emps as $e): $a=$att[$e['id']]??[]; $status=(string)($a['status'] ?? 'present'); ?>
-            <div class="attendance-compact-card" data-att-card data-employee-id="<?= (int)$e['id'] ?>" data-employee-name="<?=ws_h($e['full_name'])?>" data-employee-meta="<?=ws_h(ucfirst($e['category']).' - '.$e['employee_code'])?>">
+          <?php foreach($emps as $e): $a=$att[$e['id']]??[]; $status=(string)($a['status'] ?? 'present'); $initials=strtoupper(substr((string)$e['full_name'],0,1)); ?>
+            <div class="attendance-row-pro" data-att-row data-att-card data-category="<?=ws_h((string)$e['category'])?>" data-department="<?=ws_h((string)$e['department_name'])?>" data-site="<?=ws_h((string)$e['site_name'])?>" data-search="<?=ws_h(strtolower($e['full_name'].' '.$e['employee_code'].' '.$e['department_name'].' '.$e['site_name']))?>" data-employee-name="<?=ws_h($e['full_name'])?>" data-employee-meta="<?=ws_h($e['department_name'].' - '.$e['site_name'])?>">
               <input type="hidden" name="rows[<?= (int)$e['id']?>][employee_id]" value="<?= (int)$e['id']?>">
               <input type="hidden" name="rows[<?= (int)$e['id']?>][status]" value="<?=ws_h($status)?>" data-att-input="status">
               <input type="hidden" name="rows[<?= (int)$e['id']?>][time_in]" value="<?=ws_h((string)($a['time_in'] ?? ''))?>" data-att-input="time_in">
@@ -295,34 +383,61 @@ function ws_render_attendance(PDO $pdo,string $q=''): void { require_permission(
               <input type="hidden" name="rows[<?= (int)$e['id']?>][overtime_hours]" value="<?=ws_h((string)($a['overtime_hours'] ?? 0))?>" data-att-input="overtime_hours">
               <input type="hidden" name="rows[<?= (int)$e['id']?>][notes]" value="<?=ws_h((string)($a['notes'] ?? ''))?>" data-att-input="notes">
 
-              <div class="attendance-compact-person">
-                <div class="attendance-avatar"><?=ws_h(strtoupper(substr((string)$e['full_name'],0,1)))?></div>
+              <div class="employee-col">
+                <div class="attendance-avatar pro"><?=$initials?></div>
                 <div>
+                  <div class="employee-code"><?=ws_h($e['employee_code'])?></div>
                   <strong><?=ws_h($e['full_name'])?></strong>
-                  <div class="text-muted small"><?=ws_h(ucfirst($e['category']))?> - <?=ws_h($e['employee_code'])?></div>
+                  <div class="text-muted small"><?=ws_h(ucfirst($e['category']))?></div>
                 </div>
               </div>
-
-              <div class="attendance-compact-actions">
-                <button type="button" class="btn btn-sm attendance-quick-btn" data-att-quick="present">Present</button>
-                <button type="button" class="btn btn-sm attendance-quick-btn" data-att-quick="late">Late</button>
-                <button type="button" class="btn btn-sm attendance-quick-btn" data-att-quick="absent">Absent</button>
-                <button type="button" class="btn btn-sm attendance-quick-btn" data-att-quick="rest_day">Rest</button>
+              <div class="dept-col">
+                <div><?=ws_h($e['department_name'])?></div>
+                <div class="text-muted small"><?=ws_h($e['site_name'])?></div>
               </div>
-
-              <div class="attendance-compact-meta">
-                <span class="attendance-status-pill" data-att-status-pill><?=ws_h(ucfirst(str_replace('_',' ',$status)))?></span>
-                <span data-att-summary-line><?=ws_h((string)($a['time_in'] ?? '--:--'))?> to <?=ws_h((string)($a['time_out'] ?? '--:--'))?></span>
+              <div class="time-col" data-att-display="time_in"><?=ws_h((string)($a['time_in'] ?: '-'))?></div>
+              <div class="time-col" data-att-display="time_out"><?=ws_h((string)($a['time_out'] ?: '-'))?></div>
+              <div><span class="attendance-status-pill" data-att-status-pill><?=ws_h(ucfirst(str_replace('_',' ',$status)))?></span></div>
+              <div class="late-col" data-att-display="late_minutes"><?=ws_h((string)($a['late_minutes'] ?? 0))?> min</div>
+              <div class="ot-col" data-att-display="overtime_hours"><?=number_format((float)($a['overtime_hours'] ?? 0),2)?></div>
+              <div class="action-col">
+                <button type="button" class="attendance-icon-btn quick present" data-att-quick="present">P</button>
+                <button type="button" class="attendance-icon-btn quick late" data-att-quick="late">L</button>
+                <button type="button" class="attendance-icon-btn quick absent" data-att-quick="absent">A</button>
+                <button type="button" class="attendance-icon-btn" data-att-open-details>Edit</button>
               </div>
-
-              <button type="button" class="btn btn-outline-secondary btn-sm" data-att-open-details>Details</button>
             </div>
           <?php endforeach; ?>
         </div>
-
-        <?php if($can): ?><div class="mt-3"><button class="btn btn-primary">Save Attendance</button></div><?php endif; ?>
       </form>
-    </div>
+    </section>
+  </div>
+
+  <div class="attendance-footer-grid">
+    <section class="workspace-section-card attendance-footer-card">
+      <div class="attendance-card-title">Attendance Settings (Work Schedule)</div>
+      <div class="attendance-settings-grid">
+        <div><span>Work Start:</span><strong><?=ws_h($settings['work_start'])?></strong></div>
+        <div><span>Work End:</span><strong><?=ws_h($settings['work_end'])?></strong></div>
+        <div><span>Grace Period:</span><strong><?=ws_h($settings['late_grace_minutes'])?> min</strong></div>
+        <div><span>Overtime After:</span><strong><?=ws_h($settings['overtime_after_hours'])?> hrs</strong></div>
+      </div>
+      <button class="btn btn-light btn-sm mt-2" data-workspace-open="attendanceSettingsModal">View Settings</button>
+    </section>
+    <section class="workspace-section-card attendance-footer-card">
+      <div class="attendance-card-title">Quick Summary (<?=date('M 1',strtotime($date))?> - <?=date('M d, Y',strtotime($date))?>)</div>
+      <div class="attendance-quick-summary">
+        <div><span>Present</span><strong><?=$monthlyPresent?></strong></div>
+        <div><span>Late</span><strong><?=$monthlyLate?></strong></div>
+        <div><span>Absent</span><strong><?=$monthlyAbsent?></strong></div>
+        <div><span>Payroll Impact</span><strong>₱ <?=number_format($payrollImpact,0)?></strong></div>
+      </div>
+    </section>
+    <section class="workspace-section-card attendance-footer-card">
+      <div class="attendance-card-title">Payroll Preview</div>
+      <div class="text-muted small mb-3">Based on current attendance</div>
+      <button class="btn btn-light btn-sm">View Payroll Preview</button>
+    </section>
   </div>
 </div>
 <div class="modal fade" id="attendanceEntryModal" tabindex="-1" aria-hidden="true">

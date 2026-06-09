@@ -165,7 +165,7 @@
       total=((total%(24*60))+(24*60))%(24*60);
       return `${pad(Math.floor(total/60))}:${pad(total%60)}`;
     }
-    function cardInputs(card){
+    function rowInputs(card){
       return {
         status: card.querySelector('[data-att-input="status"]'),
         time_in: card.querySelector('[data-att-input="time_in"]'),
@@ -176,12 +176,12 @@
       };
     }
     function setCardValue(card,key,value){
-      const input=cardInputs(card)[key];
+      const input=rowInputs(card)[key];
       if(input) input.value=value;
     }
     function statusLabel(value){ return String(value||'present').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); }
     function summaryText(card){
-      const inputs=cardInputs(card);
+      const inputs=rowInputs(card);
       const tin=inputs.time_in?.value||'--:--';
       const tout=inputs.time_out?.value||'--:--';
       const late=inputs.late_minutes?.value||'0';
@@ -189,11 +189,18 @@
       return `In ${tin} | Out ${tout} | Late ${late} | OT ${ot}`;
     }
     function paintCard(card){
-      const inputs=cardInputs(card);
+      const inputs=rowInputs(card);
       const status=inputs.status?.value||'present';
       card.dataset.status=status;
       card.querySelector('[data-att-status-pill]')?.replaceChildren(document.createTextNode(statusLabel(status)));
-      card.querySelector('[data-att-summary-line]')?.replaceChildren(document.createTextNode(summaryText(card)));
+      const inEl=card.querySelector('[data-att-display="time_in"]');
+      const outEl=card.querySelector('[data-att-display="time_out"]');
+      const lateEl=card.querySelector('[data-att-display="late_minutes"]');
+      const otEl=card.querySelector('[data-att-display="overtime_hours"]');
+      if(inEl) inEl.textContent=inputs.time_in?.value||'-';
+      if(outEl) outEl.textContent=inputs.time_out?.value||'-';
+      if(lateEl) lateEl.textContent=`${inputs.late_minutes?.value||0} min`;
+      if(otEl) otEl.textContent=Number(inputs.overtime_hours?.value||0).toFixed(2);
       card.querySelectorAll('[data-att-quick]').forEach(btn=>btn.classList.toggle('active',btn.dataset.attQuick===status));
       const pill=card.querySelector('[data-att-status-pill]');
       if(pill){
@@ -213,7 +220,7 @@
         setCardValue(card,'time_in',start);
         setCardValue(card,'time_out',end);
         setCardValue(card,'late_minutes','0');
-        if(!(cardInputs(card).overtime_hours?.value)) setCardValue(card,'overtime_hours','0');
+        if(!(rowInputs(card).overtime_hours?.value)) setCardValue(card,'overtime_hours','0');
       } else if(status==='late'){
         setCardValue(card,'time_in',addMinutes(start,grace||15));
         setCardValue(card,'time_out',end);
@@ -232,8 +239,8 @@
     function updateSummary(){
       let present=0,late=0,absent=0,half=0;
       form.querySelectorAll('[data-att-card]').forEach(card=>{
-        const status=cardInputs(card).status?.value||'present';
-        if(status==='present' || status==='late') present++;
+        const status=rowInputs(card).status?.value||'present';
+        if(status==='present') present++;
         if(status==='late') late++;
         if(status==='absent') absent++;
         if(status==='half_day') half++;
@@ -244,6 +251,19 @@
       if(numbers[2]) numbers[2].textContent=String(absent);
       if(numbers[3]) numbers[3].textContent=String(half);
     }
+    function filterRows(){
+      const category=(shell.querySelector('[data-att-category-tabs] .active')?.dataset.attCategory||'office').toLowerCase();
+      const department=(shell.querySelector('[data-att-filter="department"]')?.value||'').toLowerCase();
+      const site=(shell.querySelector('[data-att-filter="site"]')?.value||'').toLowerCase();
+      const search=(shell.querySelector('[data-att-search]')?.value||'').trim().toLowerCase();
+      form.querySelectorAll('[data-att-row]').forEach(row=>{
+        const matchCategory=(row.dataset.category||'').toLowerCase()===category;
+        const matchDepartment=!department || (row.dataset.department||'').toLowerCase()===department;
+        const matchSite=!site || (row.dataset.site||'').toLowerCase()===site;
+        const matchSearch=!search || (row.dataset.search||'').includes(search);
+        row.classList.toggle('d-none', !(matchCategory && matchDepartment && matchSite && matchSearch));
+      });
+    }
     form.querySelectorAll('[data-att-card]').forEach(card=>{
       paintCard(card);
       card.querySelectorAll('[data-att-quick]').forEach(btn=>{
@@ -251,7 +271,7 @@
       });
       card.querySelector('[data-att-open-details]')?.addEventListener('click',()=>{
         activeCard=card;
-        const inputs=cardInputs(card);
+        const inputs=rowInputs(card);
         Object.entries(modalFields).forEach(([key,field])=>{ field.value=inputs[key]?.value||''; });
         const title=modalEl?.querySelector('#attendanceEntryTitle');
         const meta=modalEl?.querySelector('#attendanceEntryMeta');
@@ -259,6 +279,23 @@
         if(meta) meta.textContent=card.dataset.employeeMeta||'';
         modal?.show();
       });
+    });
+    shell.querySelectorAll('[data-att-category]').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        shell.querySelectorAll('[data-att-category]').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        filterRows();
+      });
+    });
+    shell.querySelectorAll('[data-att-filter]').forEach(sel=>sel.addEventListener('change',filterRows));
+    shell.querySelector('[data-att-search]')?.addEventListener('input',filterRows);
+    shell.querySelector('[data-att-today]')?.addEventListener('click',()=>{
+      const inp=shell.querySelector('[data-attendance-date]');
+      if(!inp) return;
+      const d=new Date();
+      const today=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+      inp.value=today;
+      inp.dispatchEvent(new Event('change'));
     });
     form.querySelectorAll('[data-att-bulk]').forEach(btn=>{
       btn.addEventListener('click',()=>{
@@ -279,6 +316,7 @@
       });
     });
     updateSummary();
+    filterRows();
   }
   document.querySelectorAll('[data-module]').forEach(el=>el.addEventListener('click',()=>load(el.dataset.module)));
   document.getElementById('workspaceRefresh')?.addEventListener('click',()=>load(active));
