@@ -79,6 +79,23 @@ if (!function_exists('is_logged_in')) {
               <?php if (isset($pdo) && function_exists('current_user_can') && current_user_can($pdo, 'view_account_dashboard')): ?>
                 <a class="nav-link nav-pill<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'account_dashboard.php' ? ' active' : '' ?>" href="account_dashboard.php">Account Dashboard</a>
               <?php endif; ?>
+              <?php if (isset($pdo) && function_exists('current_user_can') && (current_user_can($pdo, 'view_projects') || current_user_can($pdo, 'view_finance') || current_user_can($pdo, 'view_hr') || current_user_can($pdo, 'view_inventory') || current_user_can($pdo, 'view_documents') || current_user_can($pdo, 'view_reports'))): ?>
+                <div class="nav-item dropdown">
+                  <a class="nav-link nav-pill dropdown-toggle<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'workspace.php' ? ' active' : '' ?>" href="workspace.php" role="button" data-bs-toggle="dropdown" aria-expanded="false">Workspace</a>
+                  <ul class="dropdown-menu dropdown-menu-dark shadow">
+                    <li><a class="dropdown-item" href="workspace.php#overview">Overview</a></li>
+                    <?php if (current_user_can($pdo, 'view_projects')): ?><li><a class="dropdown-item" href="workspace.php#projects">Projects</a></li><?php endif; ?>
+                    <?php if (current_user_can($pdo, 'view_estimates')): ?><li><a class="dropdown-item" href="workspace.php#estimates">Estimates</a></li><?php endif; ?>
+                    <?php if (current_user_can($pdo, 'view_proposals')): ?><li><a class="dropdown-item" href="workspace.php#proposals">Proposals</a></li><?php endif; ?>
+                    <?php if (current_user_can($pdo, 'view_plans')): ?><li><a class="dropdown-item" href="workspace.php#plans">Plans</a></li><?php endif; ?>
+                    <?php if (current_user_can($pdo, 'view_finance')): ?><li><hr class="dropdown-divider"></li><li><a class="dropdown-item" href="workspace.php#expenses">Expenses</a></li><li><a class="dropdown-item" href="workspace.php#invoices">Invoices</a></li><?php endif; ?>
+                    <?php if (current_user_can($pdo, 'view_hr')): ?><li><a class="dropdown-item" href="workspace.php#employees">Employees</a></li><li><a class="dropdown-item" href="workspace.php#attendance">Attendance</a></li><?php endif; ?>
+                    <?php if (current_user_can($pdo, 'view_inventory')): ?><li><a class="dropdown-item" href="workspace.php#inventory">Inventory</a></li><?php endif; ?>
+                    <?php if (current_user_can($pdo, 'view_documents')): ?><li><a class="dropdown-item" href="workspace.php#documents">Documents</a></li><?php endif; ?>
+                    <?php if (current_user_can($pdo, 'view_reports')): ?><li><a class="dropdown-item" href="workspace.php#reports">Reports</a></li><?php endif; ?>
+                  </ul>
+                </div>
+              <?php endif; ?>
               <span class="nav-divider d-none d-lg-block"></span>
               <div class="nav-section-label d-lg-none">Management</div>
               <?php if (isset($pdo) && function_exists('current_user_can') && current_user_can($pdo, 'access_admin_panel')): ?>

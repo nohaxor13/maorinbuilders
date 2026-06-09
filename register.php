@@ -10,6 +10,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $stmt = $pdo->prepare("INSERT INTO users (name,email,password_hash) VALUES (?,?,?)");
     try {
         $stmt->execute([$name, $email, $pass]);
+        $userId = (int)$pdo->lastInsertId();
+        ensure_table_user_roles($pdo);
+        $roleStmt = $pdo->prepare("INSERT INTO user_roles (user_id, role) VALUES (?, 'staff')");
+        $roleStmt->execute([$userId]);
         header("Location: login.php");
         exit;
     } catch (PDOException $e) {
