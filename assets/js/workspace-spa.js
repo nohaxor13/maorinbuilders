@@ -80,6 +80,7 @@
         preview.innerHTML=file ? `<span class="employee-photo-preview-label">${escapeHtml(file.name)}</span>` : '<span>Photo</span>';
       });
     });
+    scope.querySelectorAll('[data-attendance-board]').forEach(initAttendanceBoard);
     scope.querySelectorAll('[data-estimate-builder]').forEach(initEstimateBuilder);
     scope.querySelectorAll('[data-proposal-builder]').forEach(initProposalBuilder);
   }
@@ -136,6 +137,148 @@
     if(form.dataset.proposalBound) return; form.dataset.proposalBound='1';
     const est=form.querySelector('[data-proposal-estimate]');
     est?.addEventListener('change',()=>{ const opt=est.selectedOptions[0]; if(!opt) return; const title=form.querySelector('[data-proposal-title]'); const client=form.querySelector('[data-proposal-client]'); const loc=form.querySelector('[data-proposal-location]'); const type=form.querySelector('[data-proposal-type]'); const amount=form.querySelector('[data-proposal-amount]'); if(title&&!title.value) title.value=opt.dataset.title||''; if(client&&!client.value) client.value=opt.dataset.client||''; if(loc&&!loc.value) loc.value=opt.dataset.location||''; if(type&&opt.dataset.type) type.value=opt.dataset.type; if(amount&&num(amount.value)<=0) amount.value=opt.dataset.amount||0; });
+  }
+  function initAttendanceBoard(form){
+    if(form.dataset.attendanceBound) return; form.dataset.attendanceBound='1';
+    const start=form.dataset.start||'08:00';
+    const end=form.dataset.end||'17:00';
+    const grace=Math.max(0, parseInt(form.dataset.grace||'0',10)||0);
+    const shell=form.closest('.attendance-shell')||form;
+    const modalEl=shell.querySelector('#attendanceEntryModal') || document.getElementById('attendanceEntryModal');
+    const modal=modalEl&&window.bootstrap ? bootstrap.Modal.getOrCreateInstance(modalEl) : null;
+    const modalFields={};
+    let activeCard=null;
+    if(modalEl){
+      modalEl.querySelectorAll('[data-att-modal-field]').forEach(field=>{ modalFields[field.dataset.attModalField]=field; });
+      modalEl.querySelector('[data-att-save-details]')?.addEventListener('click',()=>{
+        if(!activeCard) return;
+        Object.entries(modalFields).forEach(([key,field])=>setCardValue(activeCard,key,field.value));
+        paintCard(activeCard);
+        modal?.hide();
+      });
+    }
+    function pad(n){ return String(n).padStart(2,'0'); }
+    function addMinutes(time, mins){
+      if(!time || !/^\d{2}:\d{2}$/.test(time)) return time;
+      const [h,m]=time.split(':').map(Number);
+      let total=h*60+m+mins;
+      total=((total%(24*60))+(24*60))%(24*60);
+      return `${pad(Math.floor(total/60))}:${pad(total%60)}`;
+    }
+    function cardInputs(card){
+      return {
+        status: card.querySelector('[data-att-input="status"]'),
+        time_in: card.querySelector('[data-att-input="time_in"]'),
+        time_out: card.querySelector('[data-att-input="time_out"]'),
+        late_minutes: card.querySelector('[data-att-input="late_minutes"]'),
+        overtime_hours: card.querySelector('[data-att-input="overtime_hours"]'),
+        notes: card.querySelector('[data-att-input="notes"]')
+      };
+    }
+    function setCardValue(card,key,value){
+      const input=cardInputs(card)[key];
+      if(input) input.value=value;
+    }
+    function statusLabel(value){ return String(value||'present').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); }
+    function summaryText(card){
+      const inputs=cardInputs(card);
+      const tin=inputs.time_in?.value||'--:--';
+      const tout=inputs.time_out?.value||'--:--';
+      const late=inputs.late_minutes?.value||'0';
+      const ot=inputs.overtime_hours?.value||'0';
+      return `In ${tin} | Out ${tout} | Late ${late} | OT ${ot}`;
+    }
+    function paintCard(card){
+      const inputs=cardInputs(card);
+      const status=inputs.status?.value||'present';
+      card.dataset.status=status;
+      card.querySelector('[data-att-status-pill]')?.replaceChildren(document.createTextNode(statusLabel(status)));
+      card.querySelector('[data-att-summary-line]')?.replaceChildren(document.createTextNode(summaryText(card)));
+      card.querySelectorAll('[data-att-quick]').forEach(btn=>btn.classList.toggle('active',btn.dataset.attQuick===status));
+      const pill=card.querySelector('[data-att-status-pill]');
+      if(pill){
+        pill.className='attendance-status-pill';
+        if(status==='present') pill.classList.add('present');
+        else if(status==='late') pill.classList.add('late');
+        else if(status==='absent') pill.classList.add('absent');
+        else if(status==='rest_day') pill.classList.add('rest');
+        else if(status==='leave') pill.classList.add('leave');
+        else if(status==='half_day') pill.classList.add('half');
+      }
+      updateSummary();
+    }
+    function applyQuick(card,status){
+      setCardValue(card,'status',status);
+      if(status==='present'){
+        setCardValue(card,'time_in',start);
+        setCardValue(card,'time_out',end);
+        setCardValue(card,'late_minutes','0');
+        if(!(cardInputs(card).overtime_hours?.value)) setCardValue(card,'overtime_hours','0');
+      } else if(status==='late'){
+        setCardValue(card,'time_in',addMinutes(start,grace||15));
+        setCardValue(card,'time_out',end);
+        setCardValue(card,'late_minutes',String(grace||15));
+      } else if(status==='absent' || status==='rest_day' || status==='leave'){
+        setCardValue(card,'time_in','');
+        setCardValue(card,'time_out','');
+        setCardValue(card,'late_minutes','0');
+        setCardValue(card,'overtime_hours','0');
+      } else if(status==='half_day'){
+        setCardValue(card,'time_in',start);
+        setCardValue(card,'time_out',addMinutes(start,240));
+      }
+      paintCard(card);
+    }
+    function updateSummary(){
+      let present=0,late=0,absent=0,half=0;
+      form.querySelectorAll('[data-att-card]').forEach(card=>{
+        const status=cardInputs(card).status?.value||'present';
+        if(status==='present' || status==='late') present++;
+        if(status==='late') late++;
+        if(status==='absent') absent++;
+        if(status==='half_day') half++;
+      });
+      const numbers=shell.querySelectorAll('.attendance-summary-card b');
+      if(numbers[0]) numbers[0].textContent=String(present);
+      if(numbers[1]) numbers[1].textContent=String(late);
+      if(numbers[2]) numbers[2].textContent=String(absent);
+      if(numbers[3]) numbers[3].textContent=String(half);
+    }
+    form.querySelectorAll('[data-att-card]').forEach(card=>{
+      paintCard(card);
+      card.querySelectorAll('[data-att-quick]').forEach(btn=>{
+        btn.addEventListener('click',()=>applyQuick(card,btn.dataset.attQuick||'present'));
+      });
+      card.querySelector('[data-att-open-details]')?.addEventListener('click',()=>{
+        activeCard=card;
+        const inputs=cardInputs(card);
+        Object.entries(modalFields).forEach(([key,field])=>{ field.value=inputs[key]?.value||''; });
+        const title=modalEl?.querySelector('#attendanceEntryTitle');
+        const meta=modalEl?.querySelector('#attendanceEntryMeta');
+        if(title) title.textContent=card.dataset.employeeName||'Attendance Details';
+        if(meta) meta.textContent=card.dataset.employeeMeta||'';
+        modal?.show();
+      });
+    });
+    form.querySelectorAll('[data-att-bulk]').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        const mode=btn.dataset.attBulk||'present';
+        form.querySelectorAll('[data-att-card]').forEach(card=>{
+          if(mode==='clear'){
+            setCardValue(card,'status','present');
+            setCardValue(card,'time_in','');
+            setCardValue(card,'time_out','');
+            setCardValue(card,'late_minutes','0');
+            setCardValue(card,'overtime_hours','0');
+            setCardValue(card,'notes','');
+            paintCard(card);
+          } else {
+            applyQuick(card,mode);
+          }
+        });
+      });
+    });
+    updateSummary();
   }
   document.querySelectorAll('[data-module]').forEach(el=>el.addEventListener('click',()=>load(el.dataset.module)));
   document.getElementById('workspaceRefresh')?.addEventListener('click',()=>load(active));
