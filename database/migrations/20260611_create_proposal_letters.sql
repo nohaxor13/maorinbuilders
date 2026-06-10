@@ -19,3 +19,18 @@ CREATE TABLE IF NOT EXISTS proposal_letters (
   INDEX idx_proposal_letters_status (status),
   INDEX idx_proposal_letters_updated_at (updated_at)
 );
+
+CREATE TABLE IF NOT EXISTS proposal_letter_settings (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  proposal_id INT NOT NULL,
+  header_mode VARCHAR(20) NOT NULL DEFAULT 'text',
+  header_title VARCHAR(180) NULL,
+  header_subtitle VARCHAR(180) NULL,
+  header_line1 VARCHAR(255) NULL,
+  header_line2 VARCHAR(255) NULL,
+  header_image_path VARCHAR(255) NULL,
+  show_header TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_proposal_letter_settings_proposal (proposal_id)
+);

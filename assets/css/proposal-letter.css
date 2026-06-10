@@ -1,1 +1,43 @@
-.proposal-letter-modal{position:fixed;inset:0;background:rgba(15,23,42,.58);z-index:9999;overflow:auto;padding:24px}.plm-panel{max-width:1180px;margin:auto;background:#f8fafc;border-radius:22px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.25)}.plm-close{float:right;border:0;background:#111827;color:white;border-radius:999px;width:34px;height:34px;font-size:22px}.plm-header,.plm-actions{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}.plm-header h2{margin:0}.pl-toolbar,.plm-actions{background:white;border:1px solid #e5e7eb;border-radius:14px;padding:10px;margin:12px 0;display:flex;gap:8px;flex-wrap:wrap}.pl-toolbar button,.plm-actions button,.pl-toolbar select,.plm-actions select,#plPaperSize{border:1px solid #d1d5db;background:white;border-radius:10px;padding:8px 10px}.proposal-letter-sheet{background:white;margin:18px auto;padding:18mm;box-shadow:0 10px 35px rgba(15,23,42,.16);font-family:Arial,sans-serif;color:#111827}.paper-a4{width:210mm;min-height:297mm}.paper-letter,.paper-short-bond{width:8.5in;min-height:11in}.paper-legal{width:8.5in;min-height:14in}.paper-long-bond{width:8.5in;min-height:13in}.pl-letterhead{display:flex;gap:16px;border-bottom:2px solid #111827;padding-bottom:12px;margin-bottom:22px}.pl-logo{width:64px;height:64px;border-radius:16px;background:#111827;color:white;display:grid;place-items:center;font-weight:800;font-size:24px}.pl-letterhead h1{margin:0;text-transform:uppercase}.pl-letterhead p{margin:2px 0}.pl-editor{min-height:600px;outline:0;line-height:1.55}.pl-editor table{width:100%;border-collapse:collapse;margin:12px 0}.pl-editor th,.pl-editor td{border:1px solid #cbd5e1;padding:8px}.proposal-cost-table th{background:#f1f5f9;text-align:left}.pl-history{background:white;border-radius:14px;padding:10px}.pl-letter-action{margin:2px;padding:6px 10px;border-radius:8px;border:1px solid #cbd5e1;background:white}@media print{.no-print,.proposal-letter-modal .plm-header,.proposal-letter-modal .pl-toolbar,.proposal-letter-modal .plm-actions,.plm-close,.pl-history{display:none!important}body{background:white!important}.proposal-letter-modal{position:static;background:white;padding:0}.plm-panel{box-shadow:none;padding:0;background:white}.proposal-letter-sheet{box-shadow:none;margin:0 auto!important}.paper-a4{width:auto;min-height:auto}}
+.proposal-letter-modal{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9999;overflow:auto;padding:18px}
+.plm-panel{max-width:980px;margin:auto;background:#fff;border-radius:18px;padding:14px;box-shadow:0 18px 50px rgba(0,0,0,.18)}
+.plm-close{float:right;border:0;background:#111827;color:#fff;border-radius:999px;width:32px;height:32px;font-size:20px}
+.plm-header,.plm-actions,.pl-toolbar,.pl-header-form{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.plm-header{justify-content:space-between;margin-bottom:10px}
+.plm-header h2{margin:0;font-size:1.2rem}
+.plm-header p{margin:2px 0 0;color:#64748b;font-size:.88rem}
+.plm-actions,.pl-toolbar,.pl-header-form{background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:8px;margin:10px 0}
+.pl-header-form{padding:10px}
+.pl-header-form label{font-size:.8rem;font-weight:700;color:#111827;display:flex;flex-direction:column;gap:4px}
+.pl-header-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%}
+.pl-header-row input,.pl-header-row select,.plm-actions select,.plm-actions button,.pl-toolbar button,.pl-toolbar select{border:1px solid #d1d5db;background:#fff;border-radius:9px;padding:7px 9px}
+.pl-header-row .full{grid-column:1/-1}
+.pl-switch{display:flex;align-items:center;gap:8px}
+.proposal-letter-shell{padding:12px 0}
+.proposal-letter-sheet{background:#fff;max-width:210mm;margin:0 auto;padding:18mm 16mm;box-shadow:0 10px 28px rgba(15,23,42,.12);color:#111827;font-family:Arial,sans-serif}
+.paper-letter,.paper-short-bond{max-width:8.5in;min-height:11in}
+.paper-a4{min-height:297mm}
+.paper-legal{max-width:8.5in;min-height:14in}
+.paper-long-bond{max-width:8.5in;min-height:13in}
+.pl-doc-header{margin-bottom:14px}
+.pl-brand-line{display:flex;gap:14px;align-items:flex-start;border-bottom:1px solid #cbd5e1;padding-bottom:12px}
+.pl-brand-mark{width:54px;height:54px;border-radius:14px;background:#111827;color:#fff;display:grid;place-items:center;font-weight:800;font-size:20px;flex:0 0 auto}
+.pl-brand-name{font-size:1.2rem;font-weight:800;line-height:1.1}
+.pl-brand-sub,.pl-brand-meta{font-size:.82rem;color:#475569;margin-top:2px}
+.pl-header-image{display:block;max-width:100%;height:auto}
+.pl-editor{min-height:760px;outline:0;line-height:1.55;font-size:13.5px}
+.pl-editor h3{font-size:1rem;margin:14px 0 8px}
+.pl-editor p{margin:0 0 10px}
+.pl-editor table{width:100%;border-collapse:collapse;margin:10px 0}
+.pl-editor th,.pl-editor td{border:1px solid #cbd5e1;padding:7px 8px;font-size:13px}
+.proposal-cost-table th{background:#f8fafc;text-align:left}
+.pl-history{background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:8px;margin-top:10px}
+.pl-letter-action{margin:2px 4px 2px 0;padding:6px 10px;border-radius:8px;border:1px solid #cbd5e1;background:#fff}
+@media(max-width:1100px){.plm-panel{max-width:100%}.pl-header-row{grid-template-columns:1fr}}
+@media print{
+  body{background:#fff!important}
+  .no-print,.plm-header,.plm-actions,.pl-toolbar,.pl-header-form,.pl-history,.plm-close{display:none!important}
+  .proposal-letter-modal{position:static;background:#fff;padding:0}
+  .plm-panel{box-shadow:none;padding:0;border-radius:0;background:#fff}
+  .proposal-letter-shell{padding:0}
+  .proposal-letter-sheet{box-shadow:none;max-width:none;margin:0;padding:18mm 16mm}
+}

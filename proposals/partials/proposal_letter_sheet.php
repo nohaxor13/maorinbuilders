@@ -1,1 +1,6 @@
-<div id="plSheet" class="proposal-letter-sheet paper-a4"><header class="pl-letterhead"><div class="pl-logo">MB</div><div><h1>Maorin Builders</h1><p>Construction • Renovation • Design & Build</p><p>Address • Contact Number • Email</p></div></header><main id="plEditor" class="pl-editor" contenteditable="true"><p>Click <strong>Reset from Proposal Data</strong> to generate a professional body template.</p></main></div>
+<div class="proposal-letter-shell">
+  <div id="plSheet" class="proposal-letter-sheet paper-a4">
+    <div id="plDocHeader" class="pl-doc-header"></div>
+    <main id="plEditor" class="pl-editor" contenteditable="true"></main>
+  </div>
+</div>
