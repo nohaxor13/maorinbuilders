@@ -46,6 +46,25 @@
   }
   function openExistingModal(id){ const el=document.getElementById(id); if(el&&window.bootstrap){ new bootstrap.Modal(el).show(); bindInside(el); } }
   function bindContent(){ bindInside(content); }
+  function setEmployeeDrawerState(shell, open){
+    if(!shell) return;
+    shell.classList.toggle('employee-drawer-open', !!open);
+    shell.querySelectorAll('[data-employee-edit-toggle]').forEach(btn=>{
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    if(open){
+      const target=shell.querySelector('.employee-edit-panel input, .employee-edit-panel select, .employee-edit-panel textarea, .employee-edit-panel button:not([data-employee-edit-close])');
+      target?.focus();
+    }
+  }
+  function openEmployeeDrawer(trigger){
+    const shell=trigger?.closest('.employee-profile-shell');
+    setEmployeeDrawerState(shell, true);
+  }
+  function closeEmployeeDrawer(trigger){
+    const shell=trigger?.closest('.employee-profile-shell');
+    setEmployeeDrawerState(shell, false);
+  }
   function parseHtmlDocument(html){
     return new DOMParser().parseFromString(html,'text/html');
   }
@@ -137,20 +156,21 @@
         reader.readAsDataURL(file);
       });
     });
-    scope.querySelectorAll('[data-employee-edit-focus]').forEach(btn=>{
-      if(btn.dataset.boundEditFocus) return;
-      btn.dataset.boundEditFocus='1';
-      btn.addEventListener('click',()=>{
-        const shell=btn.closest('.employee-profile-shell');
-        const panel=shell?.querySelector('.employee-edit-panel');
-        const target=panel?.querySelector('input, select, textarea');
-        if(panel){
-          panel.scrollIntoView({behavior:'smooth', block:'start', inline:'nearest'});
-          panel.classList.add('is-highlighted');
-          window.setTimeout(()=>panel.classList.remove('is-highlighted'), 1400);
-        }
-        target?.focus();
-      });
+    scope.querySelectorAll('[data-employee-edit-toggle]').forEach(btn=>{
+      if(btn.dataset.boundEditToggle) return;
+      btn.dataset.boundEditToggle='1';
+      btn.setAttribute('aria-expanded', 'false');
+      btn.addEventListener('click',()=>openEmployeeDrawer(btn));
+    });
+    scope.querySelectorAll('[data-employee-edit-close]').forEach(btn=>{
+      if(btn.dataset.boundEditClose) return;
+      btn.dataset.boundEditClose='1';
+      btn.addEventListener('click',()=>closeEmployeeDrawer(btn));
+    });
+    scope.querySelectorAll('.employee-edit-overlay').forEach(overlay=>{
+      if(overlay.dataset.boundEmployeeOverlay) return;
+      overlay.dataset.boundEmployeeOverlay='1';
+      overlay.addEventListener('click',()=>setEmployeeDrawerState(overlay.closest('.employee-profile-shell'), false));
     });
     scope.querySelectorAll('[data-attendance-board]').forEach(initAttendanceBoard);
     scope.querySelectorAll('[data-estimate-builder]').forEach(initEstimateBuilder);

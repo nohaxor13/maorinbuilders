@@ -226,7 +226,7 @@ function ws_render_employee_view(PDO $pdo,int $id): void {
       </div>
       <div class="employee-profile-actions">
         <button class="btn btn-outline-secondary" type="button" onclick="window.print()">Print</button>
-        <?php if($canEdit): ?><button class="btn btn-warning text-white" type="button" data-employee-edit-focus>Edit Profile</button><?php endif; ?>
+        <?php if($canEdit): ?><button class="btn btn-warning text-white" type="button" data-employee-edit-toggle>Edit Profile</button><?php endif; ?>
       </div>
     </div>
 
@@ -242,7 +242,6 @@ function ws_render_employee_view(PDO $pdo,int $id): void {
         <div class="employee-hero-meta"><?=ws_h($e['employee_code'])?> <span>&bull;</span> <?=ws_h($department ?: 'No department')?> <span>&bull;</span> <?=ws_h($jobTitle ?: 'No job title')?></div>
         <div class="employee-hero-submeta"><?=ws_h($category)?> <span>&bull;</span> <?=ws_employee_rate_label($e)?></div>
       </div>
-      <?php if($canEdit): ?><div class="employee-hero-photo-action"><button class="employee-circle-action" type="button" data-employee-edit-focus>Photo</button></div><?php endif; ?>
     </section>
 
     <div class="employee-profile-tabs">
@@ -266,10 +265,7 @@ function ws_render_employee_view(PDO $pdo,int $id): void {
       </section>
 
       <section class="workspace-section-card employee-info-card">
-        <div class="employee-section-title employee-section-title-row">
-          <span>About / Notes</span>
-          <?php if($canEdit): ?><button class="btn btn-sm btn-outline-secondary" type="button" data-employee-edit-focus>Edit</button><?php endif; ?>
-        </div>
+        <div class="employee-section-title">About / Notes</div>
         <div class="employee-note-box"><?=nl2br(ws_h(trim((string)($e['notes'] ?? '')) ?: 'No notes added yet.'))?></div>
       </section>
     </div>
@@ -285,8 +281,6 @@ function ws_render_employee_view(PDO $pdo,int $id): void {
             </div>
             <?php if($hasFile): ?>
               <a class="btn btn-sm btn-outline-primary" target="_blank" href="<?=ws_h($doc['file_path'])?>">View File</a>
-            <?php elseif($canEdit): ?>
-              <button class="btn btn-sm btn-outline-secondary" type="button" data-employee-edit-focus>Upload</button>
             <?php else: ?>
               <span class="employee-document-empty">No File</span>
             <?php endif; ?>
@@ -297,6 +291,7 @@ function ws_render_employee_view(PDO $pdo,int $id): void {
   </div>
 
   <?php if($canEdit): $deps=ws_departments($pdo); $jobs=ws_job_titles($pdo); ?>
+    <div class="employee-edit-overlay" aria-hidden="true"></div>
     <aside class="employee-edit-panel">
       <form class="employee-profile-editor" data-spa-form enctype="multipart/form-data">
         <input type="hidden" name="module" value="employees">
@@ -307,7 +302,7 @@ function ws_render_employee_view(PDO $pdo,int $id): void {
             <h4>Edit Employee</h4>
             <p>Update employee information</p>
           </div>
-          <button class="btn-close" type="button" data-bs-dismiss="modal"></button>
+          <button class="btn-close" type="button" data-employee-edit-close aria-label="Close editor"></button>
         </div>
 
         <div class="employee-edit-body">
