@@ -46,6 +46,29 @@
   }
   function openExistingModal(id){ const el=document.getElementById(id); if(el&&window.bootstrap){ new bootstrap.Modal(el).show(); bindInside(el); } }
   function bindContent(){ bindInside(content); }
+  function to24HourValue(time){
+    const value=String(time||'').trim();
+    if(!value) return '';
+    if(/^\d{2}:\d{2}$/.test(value)) return value;
+    const match=value.match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/);
+    if(!match) return '';
+    let hour=Number(match[1]);
+    const minute=Number(match[2]);
+    const suffix=match[3].toUpperCase();
+    if(hour < 1 || hour > 12 || minute < 0 || minute > 59) return '';
+    if(suffix==='AM' && hour===12) hour=0;
+    if(suffix==='PM' && hour!==12) hour+=12;
+    return `${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
+  }
+  function to12HourDisplay(time){
+    const normalized=to24HourValue(time);
+    if(!normalized) return String(time||'').trim();
+    const [hour24, minute] = normalized.split(':').map(Number);
+    const suffix=hour24>=12?'PM':'AM';
+    let hour12=hour24%12;
+    if(hour12===0) hour12=12;
+    return `${hour12}:${String(minute).padStart(2,'0')} ${suffix}`;
+  }
   function setEmployeeDrawerState(shell, open){
     if(!shell) return;
     shell.classList.toggle('employee-drawer-open', !!open);
@@ -137,7 +160,7 @@
     scope.querySelectorAll('[data-attendance-date]').forEach(inp=>{ if(inp.dataset.boundDate) return; inp.dataset.boundDate='1'; inp.addEventListener('change',()=>refreshAttendanceDate(inp.value, inp.closest('.attendance-shell'))); });
     scope.querySelectorAll('[data-att-date]').forEach(btn=>{ if(btn.dataset.boundCal) return; btn.dataset.boundCal='1'; btn.addEventListener('click',()=>{ const inp=scope.querySelector('[data-attendance-date]'); if(inp){ inp.value=btn.dataset.attDate; inp.dispatchEvent(new Event('change')); } }); });
     scope.querySelectorAll('[data-payroll-preview]').forEach(btn=>{ if(btn.dataset.boundPayrollPreview) return; btn.dataset.boundPayrollPreview='1'; btn.addEventListener('click',async()=>{ try{ await openPayrollPreviewModal(); }catch(err){ showNotice('danger',err.message||String(err)); } }); });
-    scope.querySelectorAll('[data-payroll-filter]').forEach(form=>{ if(form.dataset.boundPayroll) return; form.dataset.boundPayroll='1'; form.addEventListener('submit',e=>{ e.preventDefault(); const fd=new FormData(form); const api=new URL(window.MB_WORKSPACE.api, window.location.href); api.searchParams.set('module','payroll'); api.searchParams.set('start',fd.get('start')); api.searchParams.set('end',fd.get('end')); content.innerHTML='<div class="text-center text-muted py-5">Loading...</div>'; fetch(api,{headers:{'X-Requested-With':'fetch'}}).then(r=>r.text()).then(html=>{content.innerHTML=html; bindContent();}); }); });
+    scope.querySelectorAll('[data-payroll-filter]').forEach(form=>{ if(form.dataset.boundPayroll) return; form.dataset.boundPayroll='1'; form.addEventListener('submit',e=>{ e.preventDefault(); const fd=new FormData(form); const api=new URL(window.MB_WORKSPACE.api, window.location.href); api.searchParams.set('module','payroll'); ['period_type','period_anchor','start','end'].forEach(key=>{ const value=fd.get(key); if(value) api.searchParams.set(key, value); }); content.innerHTML='<div class="text-center text-muted py-5">Loading...</div>'; fetch(api,{headers:{'X-Requested-With':'fetch'}}).then(r=>r.text()).then(html=>{content.innerHTML=html; bindContent();}); }); });
     scope.querySelectorAll('[data-job-title-select]').forEach(sel=>{ if(sel.dataset.boundJob) return; sel.dataset.boundJob='1'; sel.addEventListener('change',()=>{ const opt=sel.selectedOptions[0]; const form=sel.closest('form'); if(!opt||!form) return; if(opt.dataset.rate) form.elements['salary_rate'].value=opt.dataset.rate; if(opt.dataset.rateType) form.elements['rate_type'].value=opt.dataset.rateType; if(opt.dataset.category) form.elements['category'].value=opt.dataset.category; if(opt.dataset.department) form.elements['department_id'].value=opt.dataset.department; if(form.elements['job_title']) form.elements['job_title'].value=opt.textContent.trim(); }); });
     scope.querySelectorAll('[data-photo-input]').forEach(inp=>{
       if(inp.dataset.boundPhoto) return;
@@ -270,7 +293,10 @@
           return;
         }
         if(modalError){ modalError.textContent=''; modalError.classList.add('d-none'); }
-        Object.entries(modalFields).forEach(([key,field])=>setCardValue(activeCard,key,field.value));
+        Object.entries(modalFields).forEach(([key,field])=>{
+          const value=(key==='time_in' || key==='time_out') ? to24HourValue(field.value) : field.value;
+          setCardValue(activeCard,key,value);
+        });
         paintCard(activeCard);
         modal?.hide();
       });
@@ -282,8 +308,9 @@
     }
     function pad(n){ return String(n).padStart(2,'0'); }
     function parseTime(time){
-      if(!time || !/^\d{2}:\d{2}$/.test(time)) return null;
-      const [h,m]=time.split(':').map(Number);
+      const normalized=to24HourValue(time);
+      if(!normalized) return null;
+      const [h,m]=normalized.split(':').map(Number);
       return h*60+m;
     }
     function formatMinutes(total){
@@ -327,8 +354,8 @@
     function statusLabel(value){ return String(value||'present').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); }
     function summaryText(card){
       const inputs=rowInputs(card);
-      const tin=inputs.time_in?.value||'--:--';
-      const tout=inputs.time_out?.value||'--:--';
+      const tin=to12HourDisplay(inputs.time_in?.value)||'--:--';
+      const tout=to12HourDisplay(inputs.time_out?.value)||'--:--';
       const late=inputs.late_minutes?.value||'0';
       const ot=inputs.overtime_hours?.value||'0';
       return `In ${tin} | Out ${tout} | Late ${late} | OT ${ot}`;
@@ -342,8 +369,8 @@
       const outEl=card.querySelector('[data-att-display="time_out"]');
       const lateEl=card.querySelector('[data-att-display="late_minutes"]');
       const otEl=card.querySelector('[data-att-display="overtime_hours"]');
-      if(inEl) inEl.textContent=inputs.time_in?.value||'-';
-      if(outEl) outEl.textContent=inputs.time_out?.value||'-';
+      if(inEl) inEl.textContent=to12HourDisplay(inputs.time_in?.value)||'-';
+      if(outEl) outEl.textContent=to12HourDisplay(inputs.time_out?.value)||'-';
       if(lateEl) lateEl.textContent=`${inputs.late_minutes?.value||0} min`;
       if(otEl) otEl.textContent=Number(inputs.overtime_hours?.value||0).toFixed(2);
       card.querySelectorAll('[data-att-quick]').forEach(btn=>btn.classList.toggle('active',btn.dataset.attQuick===status));
@@ -390,7 +417,7 @@
     function openDetails(card){
       activeCard=card;
       const inputs=rowInputs(card);
-      Object.entries(modalFields).forEach(([key,field])=>{ field.value=inputs[key]?.value||''; });
+      Object.entries(modalFields).forEach(([key,field])=>{ field.value=(key==='time_in' || key==='time_out') ? to12HourDisplay(inputs[key]?.value||'') : (inputs[key]?.value||''); });
       const title=modalEl?.querySelector('#attendanceEntryTitle');
       const meta=modalEl?.querySelector('#attendanceEntryMeta');
       const modalReasonLabel=modalEl?.querySelector('[data-att-reason-label]');
