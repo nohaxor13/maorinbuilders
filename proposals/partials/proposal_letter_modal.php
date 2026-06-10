@@ -10,24 +10,15 @@
         <option>A4</option><option>Letter</option><option>Legal</option><option>Short Bond Paper</option><option>Long Bond Paper</option>
       </select>
     </div>
-    <div class="pl-header-form">
-      <div class="pl-header-row">
-        <label>Header Mode
-          <select id="plHeaderMode">
-            <option value="text">Text Header</option>
-            <option value="image">PNG Header</option>
-          </select>
-        </label>
-        <label>Header Title<input id="plHeaderTitle" type="text" value="Maorin Builders"></label>
-        <label>Header Subtitle<input id="plHeaderSubtitle" type="text" value="Construction • Renovation • Design & Build"></label>
-        <label>Header Line 1<input id="plHeaderLine1" type="text" value="Address • Contact Number • Email"></label>
-        <label>Header Line 2<input id="plHeaderLine2" type="text" value=""></label>
-        <label>Header PNG<input id="plHeaderImage" type="file" accept="image/png"></label>
-        <label class="pl-switch full"><input id="plShowHeader" type="checkbox" checked> Show header</label>
-      </div>
-      <input type="hidden" id="plExistingHeaderImagePath" value="">
-    </div>
     <div class="pl-toolbar no-print">
+      <button id="plToggleHeader" type="button">Hide Header</button>
+      <select id="plHeaderMode">
+        <option value="text">Text Header</option>
+        <option value="image">PNG Header</option>
+      </select>
+      <label class="pl-toolbar-upload" for="plHeaderImage">Upload PNG</label>
+      <input id="plHeaderImage" type="file" accept="image/png" hidden>
+      <input type="hidden" id="plExistingHeaderImagePath" value="">
       <select id="plTemplate">
         <option>Residential Construction Proposal</option><option>Commercial Construction Proposal</option><option>Renovation Proposal</option><option>Interior Fit-Out Proposal</option><option>Design and Build Proposal</option><option>General Contractor Proposal</option><option>Custom Template</option>
       </select>
