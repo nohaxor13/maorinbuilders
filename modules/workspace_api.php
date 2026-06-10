@@ -188,10 +188,13 @@ function ws_departments(PDO $pdo): array { return $pdo->query("SELECT * FROM mb_
 function ws_job_titles(PDO $pdo): array { return $pdo->query("SELECT jt.*,d.name department_name FROM mb_job_titles jt LEFT JOIN mb_departments d ON d.id=jt.department_id WHERE jt.status='active' ORDER BY jt.category,jt.title")->fetchAll(PDO::FETCH_ASSOC); }
 function ws_fetch_employee(PDO $pdo,int $id): array { $s=$pdo->prepare("SELECT e.*,jt.title job_title_name,jt.salary_rate job_rate,jt.rate_type job_rate_type,d.name department_name FROM mb_employees e LEFT JOIN mb_job_titles jt ON jt.id=e.job_title_id LEFT JOIN mb_departments d ON d.id=e.department_id WHERE e.id=?"); $s->execute([$id]); return $s->fetch(PDO::FETCH_ASSOC) ?: []; }
 function ws_employee_docs(PDO $pdo,int $id): array { $s=$pdo->prepare("SELECT * FROM mb_employee_documents WHERE employee_id=? ORDER BY document_type,id DESC"); $s->execute([$id]); return $s->fetchAll(PDO::FETCH_ASSOC); }
+function ws_employee_attendance_records(PDO $pdo,int $id): array { $s=$pdo->prepare("SELECT attendance_date,time_in,time_out,status,late_minutes,overtime_hours,payable_day,notes FROM mb_attendance WHERE employee_id=? ORDER BY attendance_date DESC,id DESC LIMIT 24"); $s->execute([$id]); return $s->fetchAll(PDO::FETCH_ASSOC); }
+function ws_employee_payroll_records(PDO $pdo,int $id): array { $s=$pdo->prepare("SELECT pi.*,pp.period_start,pp.period_end,pp.title,pp.status AS period_status,pp.created_at FROM mb_payroll_items pi INNER JOIN mb_payroll_periods pp ON pp.id=pi.payroll_id WHERE pi.employee_id=? ORDER BY pp.period_end DESC,pp.id DESC LIMIT 24"); $s->execute([$id]); return $s->fetchAll(PDO::FETCH_ASSOC); }
 function ws_age_label(?string $birthDate): string { if(!$birthDate) return ''; try{ $dob=new DateTime($birthDate); $now=new DateTime('today'); return (string)$dob->diff($now)->y; }catch(Throwable $e){ return ''; } }
 function ws_employee_rate_label(array $e): string { $rate=(float)($e['salary_rate'] ?: $e['daily_rate']); if($rate<=0) return 'Rate not set'; $type=trim((string)($e['rate_type'] ?? 'daily')); return ws_money($rate).' / '.ws_h($type); }
 function ws_doc_status_class(?string $status, bool $hasFile): string { if(!$hasFile) return 'missing'; return match((string)$status){ 'verified','submitted' => 'submitted', 'expired' => 'expired', default => 'pending', }; }
 function ws_doc_status_label(?string $status, bool $hasFile): string { if(!$hasFile) return 'Missing'; return ucfirst((string)($status ?: 'Pending')); }
+function ws_attendance_status_label(?string $status): string { return ucfirst(str_replace('_',' ',(string)($status ?: 'present'))); }
 
 function ws_render_jobtitles(PDO $pdo,string $q=''): void { require_permission($pdo,'manage_employees'); $rows=$pdo->query("SELECT jt.*,d.name department_name FROM mb_job_titles jt LEFT JOIN mb_departments d ON d.id=jt.department_id ORDER BY jt.updated_at DESC,jt.id DESC")->fetchAll(PDO::FETCH_ASSOC); $deps=ws_departments($pdo); ?>
 <div class="d-flex justify-content-between align-items-center mb-3"><div><h5 class="mb-0">Job Titles & Salary Rates</h5><div class="text-muted small">Create reusable job titles so employee forms use dropdowns instead of manual salary typing.</div></div><button class="btn btn-primary btn-sm" data-workspace-open="jobTitleModal">New Job Title</button></div>
@@ -209,6 +212,8 @@ function ws_render_employee_view(PDO $pdo,int $id): void {
   $docs=ws_employee_docs($pdo,$id);
   $docMap=[];
   foreach($docs as $d){ if(!isset($docMap[$d['document_type']])) $docMap[$d['document_type']]=$d; }
+  $attendanceRows=ws_employee_attendance_records($pdo,$id);
+  $payrollRows=ws_employee_payroll_records($pdo,$id);
   $canEdit=current_user_can($pdo,'manage_employees');
   $age=ws_age_label($e['birth_date']??null);
   $statusKey=(string)($e['status'] ?? 'active');
@@ -245,15 +250,15 @@ function ws_render_employee_view(PDO $pdo,int $id): void {
     </section>
 
     <div class="employee-profile-tabs">
-      <button class="active" type="button">Overview</button>
-      <button type="button">Documents</button>
-      <button type="button">Attendance</button>
-      <button type="button">Payroll</button>
-      <button type="button">Performance</button>
-      <button type="button">History</button>
+      <button class="active" type="button" data-employee-tab="overview">Overview</button>
+      <button type="button" data-employee-tab="documents">Documents</button>
+      <button type="button" data-employee-tab="attendance">Attendance</button>
+      <button type="button" data-employee-tab="payroll">Payroll</button>
+      <button type="button" data-employee-tab="performance">Performance</button>
+      <button type="button" data-employee-tab="history">History</button>
     </div>
 
-    <div class="employee-profile-grid">
+    <div class="employee-profile-grid" data-employee-section="overview">
       <section class="workspace-section-card employee-info-card">
         <div class="employee-section-title">Personal Information</div>
         <div class="employee-detail-list">
@@ -270,7 +275,7 @@ function ws_render_employee_view(PDO $pdo,int $id): void {
       </section>
     </div>
 
-    <section class="workspace-section-card employee-documents-card">
+    <section class="workspace-section-card employee-documents-card" data-employee-section="documents">
       <div class="employee-section-title">Documents</div>
       <div class="employee-documents-grid">
         <?php foreach(ws_doc_labels() as $key=>$label): $doc=$docMap[$key]??null; $hasFile=!empty($doc['file_path']); $docClass=ws_doc_status_class($doc['status']??null,$hasFile); ?>
@@ -287,6 +292,78 @@ function ws_render_employee_view(PDO $pdo,int $id): void {
           </div>
         <?php endforeach; ?>
       </div>
+    </section>
+
+    <section class="workspace-section-card employee-record-card" data-employee-section="attendance">
+      <div class="employee-section-title-row">
+        <div class="employee-section-title">Attendance</div>
+        <div class="text-muted small">Employee-specific attendance records</div>
+      </div>
+      <div class="table-responsive workspace-table-wrap">
+        <table class="table table-sm workspace-table mb-0">
+          <thead><tr><th>Date</th><th>Status</th><th>Time In</th><th>Time Out</th><th>Late</th><th>OT Hours</th><th>Payable</th><th>Notes</th></tr></thead>
+          <tbody>
+            <?php foreach($attendanceRows as $row): ?>
+              <tr>
+                <td><?=ws_h($row['attendance_date'])?></td>
+                <td><span class="mb-badge"><?=ws_h(ws_attendance_status_label($row['status']))?></span></td>
+                <td><?=ws_h($row['time_in'] ?: '-')?></td>
+                <td><?=ws_h($row['time_out'] ?: '-')?></td>
+                <td><?=ws_h((string)((int)$row['late_minutes']))?></td>
+                <td><?=ws_h(number_format((float)$row['overtime_hours'],2))?></td>
+                <td><?=ws_h(number_format((float)$row['payable_day'],2))?></td>
+                <td><?=ws_h($row['notes'] ?: '-')?></td>
+              </tr>
+            <?php endforeach; if(!$attendanceRows): ?>
+              <tr><td colspan="8" class="text-center text-muted py-4">No attendance records for this employee.</td></tr>
+            <?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="workspace-section-card employee-record-card" data-employee-section="payroll">
+      <div class="employee-section-title-row">
+        <div class="employee-section-title">Payroll</div>
+        <div class="text-muted small">Employee-specific payroll history</div>
+      </div>
+      <div class="table-responsive workspace-table-wrap">
+        <table class="table table-sm workspace-table mb-0">
+          <thead><tr><th>Period</th><th>Payroll Title</th><th>Status</th><th>Base Rate</th><th>Present</th><th>Late</th><th>Absent</th><th>OT Hours</th><th>Gross Pay</th></tr></thead>
+          <tbody>
+            <?php foreach($payrollRows as $row): ?>
+              <tr>
+                <td><?=ws_h($row['period_start'])?> to <?=ws_h($row['period_end'])?></td>
+                <td><?=ws_h($row['title'] ?: 'Payroll Period')?></td>
+                <td><span class="mb-badge"><?=ws_h($row['period_status'])?></span></td>
+                <td><?=ws_money($row['base_rate'])?></td>
+                <td><?=ws_h((string)((float)$row['present_days']))?></td>
+                <td><?=ws_h((string)((float)$row['late_days']))?></td>
+                <td><?=ws_h((string)((float)$row['absent_days']))?></td>
+                <td><?=ws_h(number_format((float)$row['overtime_hours'],2))?></td>
+                <td><strong><?=ws_money($row['gross_pay'])?></strong></td>
+              </tr>
+            <?php endforeach; if(!$payrollRows): ?>
+              <tr><td colspan="9" class="text-center text-muted py-4">No payroll records for this employee.</td></tr>
+            <?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="employee-profile-grid" data-employee-section="performance">
+      <section class="workspace-section-card employee-info-card">
+        <div class="employee-section-title">Performance</div>
+        <div class="employee-note-box">
+          Performance tracking is not yet connected here. This section is reserved for future appraisal and KPI data.
+        </div>
+      </section>
+      <section class="workspace-section-card employee-info-card" data-employee-section="history">
+        <div class="employee-section-title">History</div>
+        <div class="employee-note-box">
+          History will show role changes, salary updates, and document events once the audit feed is wired in.
+        </div>
+      </section>
     </section>
   </div>
 

@@ -172,6 +172,22 @@
       overlay.dataset.boundEmployeeOverlay='1';
       overlay.addEventListener('click',()=>setEmployeeDrawerState(overlay.closest('.employee-profile-shell'), false));
     });
+    scope.querySelectorAll('[data-employee-tab]').forEach(btn=>{
+      if(btn.dataset.boundEmployeeTab) return;
+      btn.dataset.boundEmployeeTab='1';
+      btn.addEventListener('click',async()=>{
+        const shell=btn.closest('.employee-profile-shell');
+        const tab=btn.dataset.employeeTab;
+        shell?.querySelectorAll('.employee-profile-tabs button').forEach(b=>b.classList.toggle('active', b===btn));
+        if(tab==='overview') return shell?.querySelector('[data-employee-section="overview"]')?.scrollIntoView({behavior:'smooth', block:'start'});
+        if(tab==='documents') return shell?.querySelector('[data-employee-section="documents"]')?.scrollIntoView({behavior:'smooth', block:'start'});
+        if(tab==='attendance' || tab==='payroll' || tab==='performance' || tab==='history'){
+          return shell?.querySelector(`[data-employee-section="${tab}"]`)?.scrollIntoView({behavior:'smooth', block:'start'});
+        }
+        const target=shell?.querySelector(`[data-employee-section="${tab}"]`);
+        if(target) target.scrollIntoView({behavior:'smooth', block:'start'});
+      });
+    });
     scope.querySelectorAll('[data-attendance-board]').forEach(initAttendanceBoard);
     scope.querySelectorAll('[data-estimate-builder]').forEach(initEstimateBuilder);
     scope.querySelectorAll('[data-proposal-builder]').forEach(initProposalBuilder);
