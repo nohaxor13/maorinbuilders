@@ -1,3 +1,11 @@
 node_modules/
 .playwright-mcp/
 .continue/mcpServers/
+uploads/
+storage/uploads/**/*.jpg
+storage/uploads/**/*.jpeg
+storage/uploads/**/*.png
+storage/uploads/**/*.gif
+storage/uploads/**/*.webp
+storage/uploads/**/*.bmp
+storage/uploads/**/*.svg

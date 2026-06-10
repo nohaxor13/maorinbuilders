@@ -50,6 +50,7 @@
     const value=String(time||'').trim();
     if(!value) return '';
     if(/^\d{2}:\d{2}$/.test(value)) return value;
+    if(/^\d{2}:\d{2}:\d{2}$/.test(value)) return value.slice(0,5);
     const match=value.match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/);
     if(!match) return '';
     let hour=Number(match[1]);
@@ -324,8 +325,9 @@
       return now.getHours()*60+now.getMinutes();
     }
     function addMinutes(time, mins){
-      if(!time || !/^\d{2}:\d{2}$/.test(time)) return time;
-      const [h,m]=time.split(':').map(Number);
+      const normalized=to24HourValue(time);
+      if(!normalized) return time;
+      const [h,m]=normalized.split(':').map(Number);
       let total=h*60+m+mins;
       total=((total%(24*60))+(24*60))%(24*60);
       return `${pad(Math.floor(total/60))}:${pad(total%60)}`;
