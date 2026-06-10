@@ -26,12 +26,22 @@
   }
   function modalShell(title, html){
     const old=document.getElementById('workspaceDynamicModal'); old?.remove();
+    document.querySelectorAll('.modal-backdrop').forEach(el=>el.remove());
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('padding-right');
+    document.body.style.removeProperty('overflow');
     const wrap=document.createElement('div');
     wrap.innerHTML=`<div class="modal fade" id="workspaceDynamicModal"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">${escapeHtml(title)}</h5><button class="btn-close" data-bs-dismiss="modal" type="button"></button></div><div class="modal-body">${html}</div></div></div></div>`;
     document.body.appendChild(wrap.firstElementChild);
     const el=document.getElementById('workspaceDynamicModal');
     const modal=new bootstrap.Modal(el); modal.show();
-    el.addEventListener('hidden.bs.modal',()=>el.remove(),{once:true});
+    el.addEventListener('hidden.bs.modal',()=>{
+      el.remove();
+      document.querySelectorAll('.modal-backdrop').forEach(node=>node.remove());
+      document.body.classList.remove('modal-open');
+      document.body.style.removeProperty('padding-right');
+      document.body.style.removeProperty('overflow');
+    },{once:true});
     bindInside(el);
   }
   function openExistingModal(id){ const el=document.getElementById(id); if(el&&window.bootstrap){ new bootstrap.Modal(el).show(); bindInside(el); } }
@@ -94,6 +104,13 @@
     scope.querySelectorAll('form[data-spa-form]').forEach(form=>{ if(form.dataset.bound) return; form.dataset.bound='1'; form.addEventListener('submit',submitSpaForm); });
     scope.querySelectorAll('[data-confirm-action]').forEach(btn=>{ if(btn.dataset.bound) return; btn.dataset.bound='1'; btn.addEventListener('click',()=>deleteRecord(btn)); });
     scope.querySelectorAll('[data-ws-view]').forEach(btn=>{ if(btn.dataset.bound) return; btn.dataset.bound='1'; btn.addEventListener('click',async()=>{ try{ const html=await fetchHtml(btn.dataset.wsView,'view',btn.dataset.id); modalShell('Record Details',html); }catch(e){showNotice('danger',e.message);} }); });
+    scope.querySelectorAll('.employee-col[data-ws-view="employees"]').forEach(el=>{
+      if(el.dataset.boundEmployeeView) return;
+      el.dataset.boundEmployeeView='1';
+      const open=async()=>{ try{ const html=await fetchHtml('employees','view',el.dataset.id); modalShell('Employee Profile',html); }catch(e){ showNotice('danger',e.message); } };
+      el.addEventListener('click',open);
+      el.addEventListener('keydown',e=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); open(); } });
+    });
     scope.querySelectorAll('[data-ws-edit]').forEach(btn=>{ if(btn.dataset.bound) return; btn.dataset.bound='1'; btn.addEventListener('click',async()=>{ try{ const html=await fetchHtml(btn.dataset.wsEdit,'edit',btn.dataset.id); const old=document.getElementById('workspaceEditMount'); old?.remove(); const mount=document.createElement('div'); mount.id='workspaceEditMount'; mount.innerHTML=html; document.body.appendChild(mount); const modalEl=mount.querySelector('.modal'); new bootstrap.Modal(modalEl).show(); modalEl.addEventListener('hidden.bs.modal',()=>mount.remove(),{once:true}); bindInside(mount); }catch(e){showNotice('danger',e.message);} }); });
     scope.querySelectorAll('[data-ws-approve-proposal]').forEach(btn=>{ if(btn.dataset.bound) return; btn.dataset.bound='1'; btn.addEventListener('click',async()=>{ if(!confirm('Approve this proposal and create/link a project file?')) return; await postAction({module:'proposals',action:'approve',id:btn.dataset.wsApproveProposal}); }); });
     scope.querySelectorAll('[data-module]').forEach(el=>{ if(el.dataset.boundModule) return; el.dataset.boundModule='1'; el.addEventListener('click',()=>load(el.dataset.module)); });
@@ -102,7 +119,7 @@
     scope.querySelectorAll('[data-att-date]').forEach(btn=>{ if(btn.dataset.boundCal) return; btn.dataset.boundCal='1'; btn.addEventListener('click',()=>{ const inp=scope.querySelector('[data-attendance-date]'); if(inp){ inp.value=btn.dataset.attDate; inp.dispatchEvent(new Event('change')); } }); });
     scope.querySelectorAll('[data-payroll-preview]').forEach(btn=>{ if(btn.dataset.boundPayrollPreview) return; btn.dataset.boundPayrollPreview='1'; btn.addEventListener('click',async()=>{ try{ await openPayrollPreviewModal(); }catch(err){ showNotice('danger',err.message||String(err)); } }); });
     scope.querySelectorAll('[data-payroll-filter]').forEach(form=>{ if(form.dataset.boundPayroll) return; form.dataset.boundPayroll='1'; form.addEventListener('submit',e=>{ e.preventDefault(); const fd=new FormData(form); const api=new URL(window.MB_WORKSPACE.api, window.location.href); api.searchParams.set('module','payroll'); api.searchParams.set('start',fd.get('start')); api.searchParams.set('end',fd.get('end')); content.innerHTML='<div class="text-center text-muted py-5">Loading...</div>'; fetch(api,{headers:{'X-Requested-With':'fetch'}}).then(r=>r.text()).then(html=>{content.innerHTML=html; bindContent();}); }); });
-    scope.querySelectorAll('[data-job-title-select]').forEach(sel=>{ if(sel.dataset.boundJob) return; sel.dataset.boundJob='1'; sel.addEventListener('change',()=>{ const opt=sel.selectedOptions[0]; const form=sel.closest('form'); if(!opt||!form) return; if(opt.dataset.rate) form.elements['salary_rate'].value=opt.dataset.rate; if(opt.dataset.rateType) form.elements['rate_type'].value=opt.dataset.rateType; if(opt.dataset.category) form.elements['category'].value=opt.dataset.category; if(opt.dataset.department) form.elements['department_id'].value=opt.dataset.department; }); });
+    scope.querySelectorAll('[data-job-title-select]').forEach(sel=>{ if(sel.dataset.boundJob) return; sel.dataset.boundJob='1'; sel.addEventListener('change',()=>{ const opt=sel.selectedOptions[0]; const form=sel.closest('form'); if(!opt||!form) return; if(opt.dataset.rate) form.elements['salary_rate'].value=opt.dataset.rate; if(opt.dataset.rateType) form.elements['rate_type'].value=opt.dataset.rateType; if(opt.dataset.category) form.elements['category'].value=opt.dataset.category; if(opt.dataset.department) form.elements['department_id'].value=opt.dataset.department; if(form.elements['job_title']) form.elements['job_title'].value=opt.textContent.trim(); }); });
     scope.querySelectorAll('[data-photo-input]').forEach(inp=>{
       if(inp.dataset.boundPhoto) return;
       inp.dataset.boundPhoto='1';
@@ -118,6 +135,21 @@
         const reader=new FileReader();
         reader.onload=()=>{ preview.innerHTML=`<img src="${escapeHtml(reader.result)}" alt="Preview">`; };
         reader.readAsDataURL(file);
+      });
+    });
+    scope.querySelectorAll('[data-employee-edit-focus]').forEach(btn=>{
+      if(btn.dataset.boundEditFocus) return;
+      btn.dataset.boundEditFocus='1';
+      btn.addEventListener('click',()=>{
+        const shell=btn.closest('.employee-profile-shell');
+        const panel=shell?.querySelector('.employee-edit-panel');
+        const target=panel?.querySelector('input, select, textarea');
+        if(panel){
+          panel.scrollIntoView({behavior:'smooth', block:'start', inline:'nearest'});
+          panel.classList.add('is-highlighted');
+          window.setTimeout(()=>panel.classList.remove('is-highlighted'), 1400);
+        }
+        target?.focus();
       });
     });
     scope.querySelectorAll('[data-attendance-board]').forEach(initAttendanceBoard);

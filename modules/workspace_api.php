@@ -188,6 +188,10 @@ function ws_departments(PDO $pdo): array { return $pdo->query("SELECT * FROM mb_
 function ws_job_titles(PDO $pdo): array { return $pdo->query("SELECT jt.*,d.name department_name FROM mb_job_titles jt LEFT JOIN mb_departments d ON d.id=jt.department_id WHERE jt.status='active' ORDER BY jt.category,jt.title")->fetchAll(PDO::FETCH_ASSOC); }
 function ws_fetch_employee(PDO $pdo,int $id): array { $s=$pdo->prepare("SELECT e.*,jt.title job_title_name,jt.salary_rate job_rate,jt.rate_type job_rate_type,d.name department_name FROM mb_employees e LEFT JOIN mb_job_titles jt ON jt.id=e.job_title_id LEFT JOIN mb_departments d ON d.id=e.department_id WHERE e.id=?"); $s->execute([$id]); return $s->fetch(PDO::FETCH_ASSOC) ?: []; }
 function ws_employee_docs(PDO $pdo,int $id): array { $s=$pdo->prepare("SELECT * FROM mb_employee_documents WHERE employee_id=? ORDER BY document_type,id DESC"); $s->execute([$id]); return $s->fetchAll(PDO::FETCH_ASSOC); }
+function ws_age_label(?string $birthDate): string { if(!$birthDate) return ''; try{ $dob=new DateTime($birthDate); $now=new DateTime('today'); return (string)$dob->diff($now)->y; }catch(Throwable $e){ return ''; } }
+function ws_employee_rate_label(array $e): string { $rate=(float)($e['salary_rate'] ?: $e['daily_rate']); if($rate<=0) return 'Rate not set'; $type=trim((string)($e['rate_type'] ?? 'daily')); return ws_money($rate).' / '.ws_h($type); }
+function ws_doc_status_class(?string $status, bool $hasFile): string { if(!$hasFile) return 'missing'; return match((string)$status){ 'verified','submitted' => 'submitted', 'expired' => 'expired', default => 'pending', }; }
+function ws_doc_status_label(?string $status, bool $hasFile): string { if(!$hasFile) return 'Missing'; return ucfirst((string)($status ?: 'Pending')); }
 
 function ws_render_jobtitles(PDO $pdo,string $q=''): void { require_permission($pdo,'manage_employees'); $rows=$pdo->query("SELECT jt.*,d.name department_name FROM mb_job_titles jt LEFT JOIN mb_departments d ON d.id=jt.department_id ORDER BY jt.updated_at DESC,jt.id DESC")->fetchAll(PDO::FETCH_ASSOC); $deps=ws_departments($pdo); ?>
 <div class="d-flex justify-content-between align-items-center mb-3"><div><h5 class="mb-0">Job Titles & Salary Rates</h5><div class="text-muted small">Create reusable job titles so employee forms use dropdowns instead of manual salary typing.</div></div><button class="btn btn-primary btn-sm" data-workspace-open="jobTitleModal">New Job Title</button></div>
@@ -199,7 +203,193 @@ function ws_render_jobtitle_modal(PDO $pdo, ?array $r=null): void { $deps=ws_dep
 
 function ws_render_employee_modal(PDO $pdo, ?array $e=null): void { $is=!empty($e['id']); $deps=ws_departments($pdo); $jobs=ws_job_titles($pdo); $docs=$is?ws_employee_docs($pdo,(int)$e['id']):[]; $docHave=[]; foreach($docs as $d){$docHave[$d['document_type']]=$d;} ?>
 <div class="modal fade" id="employeeResumeModal"><div class="modal-dialog modal-xl modal-dialog-scrollable"><form class="modal-content employee-resume-modal" data-spa-form enctype="multipart/form-data"><input type="hidden" name="module" value="employees"><input type="hidden" name="action" value="save"><input type="hidden" name="id" value="<?= (int)($e['id']??0)?>"><div class="modal-header"><div><h5 class="modal-title"><?= $is?'Edit':'New'?> Employee Resume File</h5><div class="text-muted small">Complete HR profile, job title salary dropdown, documents, printable profile, and ID generation.</div></div><button class="btn-close" type="button" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="employee-resume-grid"><aside class="employee-photo-panel"><div class="employee-photo-preview"><?= !empty($e['photo_path']) ? '<span class="employee-photo-preview-label">'.ws_h(basename((string)$e['photo_path'])).'</span>' : '<span>Photo</span>' ?></div><input class="form-control form-control-sm" type="file" accept="image/*" name="photo" data-photo-input><small class="text-muted">Upload 1x1 or portrait photo for resume and ID.</small><hr><label>Employee Code<input class="form-control" name="employee_code" value="<?=ws_h($e['employee_code']??'')?>" placeholder="Auto/manual"></label><label>Status<select class="form-select" name="status"><?php foreach(ws_status_options() as $k=>$v):?><option value="<?=$k?>" <?=($e['status']??'active')===$k?'selected':''?>><?=$v?></option><?php endforeach;?></select></label><label>Category<select class="form-select" name="category"><option value="office" <?=($e['category']??'office')==='office'?'selected':''?>>Office</option><option value="field" <?=($e['category']??'')==='field'?'selected':''?>>Field</option></select></label></aside><main><section><h6>Personal Information</h6><div class="mb-form-grid"><label>Full Name<input required class="form-control" name="full_name" value="<?=ws_h($e['full_name']??'')?>"></label><label>Birth Date<input class="form-control" type="date" name="birth_date" value="<?=ws_h($e['birth_date']??'')?>"></label><label>Gender<select class="form-select" name="gender"><option value="">Select</option><?php foreach(['male'=>'Male','female'=>'Female','other'=>'Other'] as $k=>$v):?><option value="<?=$k?>" <?=($e['gender']??'')===$k?'selected':''?>><?=$v?></option><?php endforeach;?></select></label><label>Civil Status<select class="form-select" name="civil_status"><option value="">Select</option><?php foreach(['single'=>'Single','married'=>'Married','widowed'=>'Widowed','separated'=>'Separated'] as $k=>$v):?><option value="<?=$k?>" <?=($e['civil_status']??'')===$k?'selected':''?>><?=$v?></option><?php endforeach;?></select></label><label>Phone<input class="form-control" name="phone" value="<?=ws_h($e['phone']??'')?>"></label><label>Email<input class="form-control" name="email" value="<?=ws_h($e['email']??'')?>"></label><label class="full">Address<textarea class="form-control" name="address" rows="2"><?=ws_h($e['address']??'')?></textarea></label><label>Emergency Contact<input class="form-control" name="emergency_contact" value="<?=ws_h($e['emergency_contact']??'')?>"></label><label>Emergency Phone<input class="form-control" name="emergency_phone" value="<?=ws_h($e['emergency_phone']??'')?>"></label></div></section><section><h6>Employment Details</h6><div class="mb-form-grid"><label>Department<select class="form-select" name="department_id"><option value="">Select Department</option><?php foreach($deps as $d):?><option value="<?= (int)$d['id']?>" data-category="<?=ws_h($d['category'])?>" <?=((int)($e['department_id']??0)===(int)$d['id']?'selected':'')?>><?=ws_h(ucfirst($d['category']).' · '.$d['name'])?></option><?php endforeach;?></select></label><label>Job Title<select class="form-select" name="job_title_id" data-job-title-select><option value="">Select Job Title</option><?php foreach($jobs as $j):?><option value="<?= (int)$j['id']?>" data-rate="<?=ws_h($j['salary_rate'])?>" data-rate-type="<?=ws_h($j['rate_type'])?>" data-category="<?=ws_h($j['category'])?>" data-department="<?= (int)$j['department_id']?>" <?=((int)($e['job_title_id']??0)===(int)$j['id']?'selected':'')?>><?=ws_h(ucfirst($j['category']).' · '.$j['title'].' · '.mb_money($j['salary_rate']).' / '.$j['rate_type'])?></option><?php endforeach;?></select></label><label>Manual Job Title<input class="form-control" name="job_title" value="<?=ws_h($e['job_title']??'')?>" placeholder="Optional override"></label><label>Employee Type<input class="form-control" name="employee_type" value="<?=ws_h($e['employee_type']??'')?>" placeholder="Regular, Contractual, Project-based"></label><label>Hire Date<input class="form-control" type="date" name="hire_date" value="<?=ws_h($e['hire_date']??'')?>"></label><label>Rate Type<select class="form-select" name="rate_type"><option value="daily" <?=($e['rate_type']??'daily')==='daily'?'selected':''?>>Daily</option><option value="monthly" <?=($e['rate_type']??'')==='monthly'?'selected':''?>>Monthly</option><option value="hourly" <?=($e['rate_type']??'')==='hourly'?'selected':''?>>Hourly</option></select></label><label>Salary Rate<input class="form-control" type="number" step="0.01" name="salary_rate" value="<?=ws_h($e['salary_rate']??($e['daily_rate']??0))?>"></label><label class="full">Notes<textarea class="form-control" name="notes" rows="3"><?=ws_h($e['notes']??'')?></textarea></label></div></section><section><h6>Required Documentation</h6><div class="employee-doc-grid"><?php foreach(ws_doc_labels() as $key=>$label): $existing=$docHave[$key]??null; ?><div class="doc-tile <?= $existing?'has-doc':''?>"><label class="form-check"><input class="form-check-input" type="checkbox" name="doc_required[]" value="<?=$key?>" <?= $existing?'checked':''?>> <span class="form-check-label"><?=$label?></span></label><?php if($existing):?><a class="small" target="_blank" href="<?=ws_h($existing['file_path'])?>">View uploaded file</a><?php endif;?><input class="form-control form-control-sm" type="file" name="doc_<?=$key?>" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"><select class="form-select form-select-sm" name="doc_status[<?=$key?>]"><option value="pending">Pending</option><option value="submitted" <?=($existing['status']??'')==='submitted'?'selected':''?>>Submitted</option><option value="verified" <?=($existing['status']??'')==='verified'?'selected':''?>>Verified</option><option value="expired" <?=($existing['status']??'')==='expired'?'selected':''?>>Expired</option></select></div><?php endforeach;?></div></section></main></div></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Save Employee</button></div></form></div></div><?php }
-function ws_render_employee_view(PDO $pdo,int $id): void { $e=ws_fetch_employee($pdo,$id); if(!$e){echo '<div class="alert alert-warning">Employee not found.</div>';return;} $docs=ws_employee_docs($pdo,$id); ?><div class="employee-view-print"><div class="d-flex justify-content-between align-items-start gap-3 mb-3"><div class="d-flex align-items-start gap-3 flex-grow-1 min-w-0"><div class="employee-photo-preview employee-photo-preview-square small" style="width:88px;height:88px;min-width:88px;min-height:88px;max-width:88px;max-height:88px;padding:0;flex:0 0 88px;overflow:hidden;"><?php if(!empty($e['photo_path'])):?><img src="<?=ws_h($e['photo_path'])?>" alt="photo" width="88" height="88" style="display:block;width:88px;height:88px;min-width:88px;min-height:88px;max-width:88px;max-height:88px;object-fit:cover;object-position:center;"><?php else:?><span>Photo</span><?php endif;?></div><div class="flex-grow-1 min-w-0"><h4 class="mb-1"><?=ws_h($e['full_name'])?></h4><div class="text-muted"><?=ws_h($e['employee_code'])?> · <?=ws_h(ucfirst($e['category']??''))?> · <?=ws_h($e['job_title_name'] ?: $e['job_title'])?></div><div><?=ws_h($e['department_name'])?> · <?=ws_money($e['salary_rate'] ?: $e['daily_rate'])?> / <?=ws_h($e['rate_type']??'daily')?></div></div></div><button class="btn btn-outline-secondary btn-sm flex-shrink-0" onclick="window.print()">Print</button></div><div class="row g-3"><div class="col-md-6"><div class="workspace-section-card"><h6>Personal</h6><p class="mb-1"><b>Phone:</b> <?=ws_h($e['phone'])?></p><p class="mb-1"><b>Email:</b> <?=ws_h($e['email'])?></p><p class="mb-1"><b>Birth Date:</b> <?=ws_h($e['birth_date'])?></p><p class="mb-1"><b>Address:</b> <?=nl2br(ws_h($e['address']))?></p></div></div><div class="col-md-6"><div class="workspace-section-card employee-id-card"><h6>Employee ID Preview</h6><div class="id-name"><?=ws_h($e['full_name'])?></div><div class="id-code"><?=ws_h($e['employee_code'])?></div><div><?=ws_h($e['job_title_name'] ?: $e['job_title'])?></div><div><?=ws_h(ucfirst($e['category']??''))?> Department</div></div></div></div><h6 class="mt-3">Documents</h6><div class="employee-doc-grid"><?php foreach(ws_doc_labels() as $k=>$label): $found=null; foreach($docs as $d){if($d['document_type']===$k){$found=$d;break;}} ?><div class="doc-tile <?= $found?'has-doc':''?>"><strong><?=$label?></strong><div class="small"><?= $found?ws_h($found['status']):'Missing'?></div><?php if($found && $found['file_path']):?><a target="_blank" href="<?=ws_h($found['file_path'])?>">Open file</a><?php endif;?></div><?php endforeach;?></div></div><?php }
+function ws_render_employee_view(PDO $pdo,int $id): void {
+  $e=ws_fetch_employee($pdo,$id);
+  if(!$e){ echo '<div class="alert alert-warning">Employee not found.</div>'; return; }
+  $docs=ws_employee_docs($pdo,$id);
+  $docMap=[];
+  foreach($docs as $d){ if(!isset($docMap[$d['document_type']])) $docMap[$d['document_type']]=$d; }
+  $canEdit=current_user_can($pdo,'manage_employees');
+  $age=ws_age_label($e['birth_date']??null);
+  $statusKey=(string)($e['status'] ?? 'active');
+  $statusLabel=ws_status_options()[$statusKey] ?? ucfirst(str_replace('_',' ',$statusKey));
+  $jobTitle=trim((string)($e['job_title_name'] ?: $e['job_title']));
+  $department=trim((string)($e['department_name'] ?: $e['department']));
+  $category=ucfirst((string)($e['category'] ?: 'office'));
+  ?>
+<div class="employee-profile-shell employee-view-print">
+  <div class="employee-profile-main">
+    <div class="employee-profile-head">
+      <div>
+        <h3 class="employee-profile-title">Employee Profile</h3>
+        <div class="employee-profile-breadcrumb">Employees <span>/</span> Profile</div>
+      </div>
+      <div class="employee-profile-actions">
+        <button class="btn btn-outline-secondary" type="button" onclick="window.print()">Print</button>
+        <?php if($canEdit): ?><button class="btn btn-warning text-white" type="button" data-employee-edit-focus>Edit Profile</button><?php endif; ?>
+      </div>
+    </div>
+
+    <section class="employee-hero-card">
+      <div class="employee-hero-media">
+        <div class="employee-photo-preview employee-photo-preview-square employee-hero-avatar">
+          <?php if(!empty($e['photo_path'])): ?><img src="<?=ws_h($e['photo_path'])?>" alt="photo"><?php else: ?><span>Photo</span><?php endif; ?>
+        </div>
+      </div>
+      <div class="employee-hero-copy">
+        <span class="employee-status-chip <?=$statusKey==='active'?'active':'inactive'?>"><?=$statusLabel?></span>
+        <h4><?=ws_h($e['full_name'])?></h4>
+        <div class="employee-hero-meta"><?=ws_h($e['employee_code'])?> <span>&bull;</span> <?=ws_h($department ?: 'No department')?> <span>&bull;</span> <?=ws_h($jobTitle ?: 'No job title')?></div>
+        <div class="employee-hero-submeta"><?=ws_h($category)?> <span>&bull;</span> <?=ws_employee_rate_label($e)?></div>
+      </div>
+      <?php if($canEdit): ?><div class="employee-hero-photo-action"><button class="employee-circle-action" type="button" data-employee-edit-focus>Photo</button></div><?php endif; ?>
+    </section>
+
+    <div class="employee-profile-tabs">
+      <button class="active" type="button">Overview</button>
+      <button type="button">Documents</button>
+      <button type="button">Attendance</button>
+      <button type="button">Payroll</button>
+      <button type="button">Performance</button>
+      <button type="button">History</button>
+    </div>
+
+    <div class="employee-profile-grid">
+      <section class="workspace-section-card employee-info-card">
+        <div class="employee-section-title">Personal Information</div>
+        <div class="employee-detail-list">
+          <div><span>Phone</span><strong><?=ws_h($e['phone'] ?: 'Not provided')?></strong></div>
+          <div><span>Email</span><strong><?=ws_h($e['email'] ?: 'Not provided')?></strong></div>
+          <div><span>Birth Date</span><strong><?=ws_h($e['birth_date'] ?: 'Not set')?><?= $age!=='' ? ' ('.$age.' yrs old)' : '' ?></strong></div>
+          <div><span>Address</span><strong><?=nl2br(ws_h($e['address'] ?: 'Not provided'))?></strong></div>
+        </div>
+      </section>
+
+      <section class="workspace-section-card employee-info-card">
+        <div class="employee-section-title employee-section-title-row">
+          <span>About / Notes</span>
+          <?php if($canEdit): ?><button class="btn btn-sm btn-outline-secondary" type="button" data-employee-edit-focus>Edit</button><?php endif; ?>
+        </div>
+        <div class="employee-note-box"><?=nl2br(ws_h(trim((string)($e['notes'] ?? '')) ?: 'No notes added yet.'))?></div>
+      </section>
+    </div>
+
+    <section class="workspace-section-card employee-documents-card">
+      <div class="employee-section-title">Documents</div>
+      <div class="employee-documents-grid">
+        <?php foreach(ws_doc_labels() as $key=>$label): $doc=$docMap[$key]??null; $hasFile=!empty($doc['file_path']); $docClass=ws_doc_status_class($doc['status']??null,$hasFile); ?>
+          <div class="employee-document-item <?=$docClass?>">
+            <div class="employee-document-copy">
+              <strong><?=ws_h($label)?></strong>
+              <span><?=ws_doc_status_label($doc['status']??null,$hasFile)?></span>
+            </div>
+            <?php if($hasFile): ?>
+              <a class="btn btn-sm btn-outline-primary" target="_blank" href="<?=ws_h($doc['file_path'])?>">View File</a>
+            <?php elseif($canEdit): ?>
+              <button class="btn btn-sm btn-outline-secondary" type="button" data-employee-edit-focus>Upload</button>
+            <?php else: ?>
+              <span class="employee-document-empty">No File</span>
+            <?php endif; ?>
+          </div>
+        <?php endforeach; ?>
+      </div>
+    </section>
+  </div>
+
+  <?php if($canEdit): $deps=ws_departments($pdo); $jobs=ws_job_titles($pdo); ?>
+    <aside class="employee-edit-panel">
+      <form class="employee-profile-editor" data-spa-form enctype="multipart/form-data">
+        <input type="hidden" name="module" value="employees">
+        <input type="hidden" name="action" value="save">
+        <input type="hidden" name="id" value="<?= (int)$e['id'] ?>">
+        <div class="employee-edit-head">
+          <div>
+            <h4>Edit Employee</h4>
+            <p>Update employee information</p>
+          </div>
+          <button class="btn-close" type="button" data-bs-dismiss="modal"></button>
+        </div>
+
+        <div class="employee-edit-body">
+          <section class="employee-edit-section employee-photo-panel">
+            <div class="employee-edit-section-title">Profile Photo</div>
+            <div class="employee-photo-upload-row">
+              <div class="employee-photo-preview employee-photo-preview-square employee-edit-avatar">
+                <?php if(!empty($e['photo_path'])): ?><img src="<?=ws_h($e['photo_path'])?>" alt="photo"><?php else: ?><span>Photo</span><?php endif; ?>
+              </div>
+              <label class="employee-photo-upload-box">
+                <input class="d-none" type="file" accept="image/*" name="photo" data-photo-input>
+                <strong>Change Photo</strong>
+                <span>JPG, PNG (Max 2MB)</span>
+              </label>
+            </div>
+          </section>
+
+          <section class="employee-edit-section">
+            <div class="employee-edit-section-title">Personal Information</div>
+            <div class="mb-form-grid">
+              <label>Full Name<input required class="form-control" name="full_name" value="<?=ws_h($e['full_name']??'')?>"></label>
+              <label>Employee ID<input class="form-control" name="employee_code" value="<?=ws_h($e['employee_code']??'')?>"></label>
+              <label>Department / Category<select class="form-select" name="department_id"><option value="">Select Department</option><?php foreach($deps as $d): ?><option value="<?= (int)$d['id']?>" data-category="<?=ws_h($d['category'])?>" <?=((int)($e['department_id']??0)===(int)$d['id']?'selected':'')?>><?=ws_h(ucfirst($d['category']).' - '.$d['name'])?></option><?php endforeach; ?></select></label>
+              <label>Position / Job Title<select class="form-select" name="job_title_id" data-job-title-select><option value="">Select Job Title</option><?php foreach($jobs as $j): ?><option value="<?= (int)$j['id']?>" data-rate="<?=ws_h($j['salary_rate'])?>" data-rate-type="<?=ws_h($j['rate_type'])?>" data-category="<?=ws_h($j['category'])?>" data-department="<?= (int)$j['department_id']?>" <?=((int)($e['job_title_id']??0)===(int)$j['id']?'selected':'')?>><?=ws_h($j['title'])?></option><?php endforeach; ?></select></label>
+              <label>Role / Access Level<input class="form-control" name="employee_type" value="<?=ws_h($e['employee_type']??'')?>" placeholder="Admin, Staff, Project-based"></label>
+              <label>Salary<input class="form-control" type="number" step="0.01" name="salary_rate" value="<?=ws_h($e['salary_rate']??($e['daily_rate']??0))?>"></label>
+              <label>Rate Type<select class="form-select" name="rate_type"><option value="daily" <?=($e['rate_type']??'daily')==='daily'?'selected':''?>>Daily</option><option value="monthly" <?=($e['rate_type']??'')==='monthly'?'selected':''?>>Monthly</option><option value="hourly" <?=($e['rate_type']??'')==='hourly'?'selected':''?>>Hourly</option><option value="project" <?=($e['rate_type']??'')==='project'?'selected':''?>>Project</option></select></label>
+              <label>Status<select class="form-select" name="status"><?php foreach(ws_status_options() as $k=>$v): ?><option value="<?=$k?>" <?=($e['status']??'active')===$k?'selected':''?>><?=$v?></option><?php endforeach; ?></select></label>
+              <input type="hidden" name="category" value="<?=ws_h($e['category']??'office')?>">
+              <input type="hidden" name="job_title" value="<?=ws_h($e['job_title']??'')?>">
+              <input type="hidden" name="hire_date" value="<?=ws_h($e['hire_date']??'')?>">
+              <input type="hidden" name="civil_status" value="<?=ws_h($e['civil_status']??'')?>">
+              <input type="hidden" name="emergency_contact" value="<?=ws_h($e['emergency_contact']??'')?>">
+              <input type="hidden" name="emergency_phone" value="<?=ws_h($e['emergency_phone']??'')?>">
+            </div>
+          </section>
+
+          <section class="employee-edit-section">
+            <div class="employee-edit-section-title">Contact Information</div>
+            <div class="mb-form-grid">
+              <label>Phone<input class="form-control" name="phone" value="<?=ws_h($e['phone']??'')?>"></label>
+              <label>Email<input class="form-control" name="email" value="<?=ws_h($e['email']??'')?>"></label>
+              <label>Birth Date<input class="form-control" type="date" name="birth_date" value="<?=ws_h($e['birth_date']??'')?>"></label>
+              <label>Gender<select class="form-select" name="gender"><option value="">Select</option><?php foreach(['male'=>'Male','female'=>'Female','other'=>'Other'] as $k=>$v): ?><option value="<?=$k?>" <?=($e['gender']??'')===$k?'selected':''?>><?=$v?></option><?php endforeach; ?></select></label>
+              <label class="full">Address<textarea class="form-control" name="address" rows="3"><?=ws_h($e['address']??'')?></textarea></label>
+            </div>
+          </section>
+
+          <section class="employee-edit-section">
+            <div class="employee-edit-section-title">Additional Information</div>
+            <div class="mb-form-grid single">
+              <label>Employment Status<select class="form-select" name="status"><?php foreach(ws_status_options() as $k=>$v): ?><option value="<?=$k?>" <?=($e['status']??'active')===$k?'selected':''?>><?=$v?></option><?php endforeach; ?></select></label>
+              <label>Notes<textarea class="form-control" name="notes" rows="4"><?=ws_h($e['notes']??'')?></textarea></label>
+            </div>
+          </section>
+
+          <section class="employee-edit-section">
+            <div class="employee-edit-section-title">Documents</div>
+            <div class="employee-edit-doc-grid">
+              <?php foreach(ws_doc_labels() as $key=>$label): $doc=$docMap[$key]??null; ?>
+                <div class="employee-edit-doc-item">
+                  <div class="d-flex justify-content-between align-items-center gap-2">
+                    <strong><?=ws_h($label)?></strong>
+                    <?php if(!empty($doc['file_path'])): ?><a class="small" target="_blank" href="<?=ws_h($doc['file_path'])?>">View</a><?php endif; ?>
+                  </div>
+                  <input class="form-control form-control-sm" type="file" name="doc_<?=$key?>" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx">
+                  <select class="form-select form-select-sm" name="doc_status[<?=$key?>]"><option value="pending">Pending</option><option value="submitted" <?=($doc['status']??'')==='submitted'?'selected':''?>>Submitted</option><option value="verified" <?=($doc['status']??'')==='verified'?'selected':''?>>Verified</option><option value="expired" <?=($doc['status']??'')==='expired'?'selected':''?>>Expired</option></select>
+                </div>
+              <?php endforeach; ?>
+            </div>
+          </section>
+        </div>
+
+        <div class="employee-edit-footer">
+          <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-warning text-white" type="submit">Save Changes</button>
+        </div>
+      </form>
+    </aside>
+  <?php endif; ?>
+</div>
+<?php }
 function ws_render_employees(PDO $pdo,string $q=''): void { require_permission($pdo,'view_hr'); $can=current_user_can($pdo,'manage_employees'); $params=[];$where=''; if($q!==''){ $where="WHERE e.full_name LIKE ? OR e.employee_code LIKE ? OR e.phone LIKE ? OR jt.title LIKE ? OR d.name LIKE ?"; $params=array_fill(0,5,'%'.$q.'%'); } $st=$pdo->prepare("SELECT e.*,jt.title job_title_name,d.name department_name FROM mb_employees e LEFT JOIN mb_job_titles jt ON jt.id=e.job_title_id LEFT JOIN mb_departments d ON d.id=e.department_id $where ORDER BY e.category,e.full_name LIMIT 300"); $st->execute($params); $rows=$st->fetchAll(PDO::FETCH_ASSOC); $office=array_filter($rows,fn($r)=>($r['category']??'office')==='office'); $field=array_filter($rows,fn($r)=>($r['category']??'')==='field'); ?>
 <div class="d-flex justify-content-between align-items-center mb-3"><div><h5 class="mb-0">Employees</h5><div class="text-muted small">Office and field records with resume profile, documents, salary title, attendance, payroll, and ID printing.</div></div><div class="d-flex gap-2"><?php if($can): ?><button class="btn btn-outline-primary btn-sm" data-module="departments">Departments</button><button class="btn btn-outline-primary btn-sm" data-module="job_titles">Job Titles</button><button class="btn btn-primary btn-sm" data-workspace-open="employeeResumeModal">New Employee</button><?php endif; ?></div></div>
 <div class="row g-3 mb-3"><div class="col-md-3"><div class="workspace-stat"><div class="stat-kicker">Office</div><div class="stat-main"><?=count($office)?></div></div></div><div class="col-md-3"><div class="workspace-stat"><div class="stat-kicker">Field</div><div class="stat-main"><?=count($field)?></div></div></div><div class="col-md-3"><div class="workspace-stat"><div class="stat-kicker">Active</div><div class="stat-main"><?=count(array_filter($rows,fn($r)=>($r['status']??'')==='active'))?></div></div></div><div class="col-md-3"><div class="workspace-stat"><div class="stat-kicker">Missing Docs</div><div class="stat-main"><?php $missing=0; foreach($rows as $r){$c=$pdo->prepare('SELECT COUNT(*) FROM mb_employee_documents WHERE employee_id=?');$c->execute([$r['id']]); if((int)$c->fetchColumn()<3)$missing++;} echo $missing;?></div></div></div></div>
@@ -386,7 +576,7 @@ function ws_render_attendance(PDO $pdo,string $q=''): void {
               <input type="hidden" name="rows[<?= (int)$e['id']?>][overtime_hours]" value="<?=ws_h((string)($a['overtime_hours'] ?? 0))?>" data-att-input="overtime_hours">
               <input type="hidden" name="rows[<?= (int)$e['id']?>][notes]" value="<?=ws_h((string)($a['notes'] ?? ''))?>" data-att-input="notes">
 
-              <div class="employee-col">
+              <div class="employee-col" role="button" tabindex="0" data-ws-view="employees" data-id="<?= (int)$e['id']?>">
                 <div class="attendance-avatar pro"><img src="<?=ws_h($avatar)?>" alt="<?=ws_h($e['full_name'])?>" loading="lazy"></div>
                 <div>
                   <div class="employee-code"><?=ws_h($e['employee_code'])?></div>
