@@ -36,6 +36,40 @@
   }
   function openExistingModal(id){ const el=document.getElementById(id); if(el&&window.bootstrap){ new bootstrap.Modal(el).show(); bindInside(el); } }
   function bindContent(){ bindInside(content); }
+  function parseHtmlDocument(html){
+    return new DOMParser().parseFromString(html,'text/html');
+  }
+  async function openPayrollPreviewModal(){
+    const html=await fetchHtml('payroll');
+    modalShell('Payroll Preview', html);
+  }
+  async function refreshAttendanceDate(dateValue, shell){
+    const url=new URL(location.href);
+    url.hash='attendance';
+    history.replaceState(null,'',url.pathname+url.search+'#attendance');
+    const api=new URL(window.MB_WORKSPACE.api, window.location.href);
+    api.searchParams.set('module','attendance');
+    api.searchParams.set('date',dateValue);
+    const host=content.querySelector('.attendance-shell')||shell;
+    if(host) host.classList.add('is-loading');
+    try{
+      const res=await fetch(api,{headers:{'X-Requested-With':'fetch'}});
+      const html=await res.text();
+      if(!res.ok) throw new Error(html.replace(/<[^>]*>/g,'').trim()||'Request failed');
+      const nextDoc=parseHtmlDocument(html);
+      const nextShell=nextDoc.querySelector('.attendance-shell');
+      if(!nextShell) throw new Error('Attendance board failed to load.');
+      if(host){
+        host.replaceWith(nextShell);
+      }else{
+        content.innerHTML=html;
+      }
+      bindContent();
+    }catch(err){
+      if(host) host.classList.remove('is-loading');
+      showNotice('danger',err.message||String(err));
+    }
+  }
 
   function bindEstimateTabs(scope){
     scope.querySelectorAll('.professional-estimate-modal .estimate-subtabs [data-bs-toggle="pill"]').forEach(btn=>{
@@ -64,8 +98,9 @@
     scope.querySelectorAll('[data-ws-approve-proposal]').forEach(btn=>{ if(btn.dataset.bound) return; btn.dataset.bound='1'; btn.addEventListener('click',async()=>{ if(!confirm('Approve this proposal and create/link a project file?')) return; await postAction({module:'proposals',action:'approve',id:btn.dataset.wsApproveProposal}); }); });
     scope.querySelectorAll('[data-module]').forEach(el=>{ if(el.dataset.boundModule) return; el.dataset.boundModule='1'; el.addEventListener('click',()=>load(el.dataset.module)); });
     scope.querySelectorAll('[data-emp-cat]').forEach(btn=>{ if(btn.dataset.boundCat) return; btn.dataset.boundCat='1'; btn.addEventListener('click',()=>{ const host=btn.closest('#workspaceContent')||scope; host.querySelectorAll('[data-emp-cat]').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); host.querySelectorAll('[data-emp-pane]').forEach(p=>p.classList.toggle('active',p.dataset.empPane===btn.dataset.empCat)); }); });
-    scope.querySelectorAll('[data-attendance-date]').forEach(inp=>{ if(inp.dataset.boundDate) return; inp.dataset.boundDate='1'; inp.addEventListener('change',()=>{ const url=new URL(location.href); url.hash='attendance'; history.replaceState(null,'',url.pathname+url.search+'#attendance'); const api=new URL(window.MB_WORKSPACE.api, window.location.href); api.searchParams.set('module','attendance'); api.searchParams.set('date',inp.value); content.innerHTML='<div class="text-center text-muted py-5">Loading...</div>'; fetch(api,{headers:{'X-Requested-With':'fetch'}}).then(r=>r.text()).then(html=>{content.innerHTML=html; bindContent();}); }); });
+    scope.querySelectorAll('[data-attendance-date]').forEach(inp=>{ if(inp.dataset.boundDate) return; inp.dataset.boundDate='1'; inp.addEventListener('change',()=>refreshAttendanceDate(inp.value, inp.closest('.attendance-shell'))); });
     scope.querySelectorAll('[data-att-date]').forEach(btn=>{ if(btn.dataset.boundCal) return; btn.dataset.boundCal='1'; btn.addEventListener('click',()=>{ const inp=scope.querySelector('[data-attendance-date]'); if(inp){ inp.value=btn.dataset.attDate; inp.dispatchEvent(new Event('change')); } }); });
+    scope.querySelectorAll('[data-payroll-preview]').forEach(btn=>{ if(btn.dataset.boundPayrollPreview) return; btn.dataset.boundPayrollPreview='1'; btn.addEventListener('click',async()=>{ try{ await openPayrollPreviewModal(); }catch(err){ showNotice('danger',err.message||String(err)); } }); });
     scope.querySelectorAll('[data-payroll-filter]').forEach(form=>{ if(form.dataset.boundPayroll) return; form.dataset.boundPayroll='1'; form.addEventListener('submit',e=>{ e.preventDefault(); const fd=new FormData(form); const api=new URL(window.MB_WORKSPACE.api, window.location.href); api.searchParams.set('module','payroll'); api.searchParams.set('start',fd.get('start')); api.searchParams.set('end',fd.get('end')); content.innerHTML='<div class="text-center text-muted py-5">Loading...</div>'; fetch(api,{headers:{'X-Requested-With':'fetch'}}).then(r=>r.text()).then(html=>{content.innerHTML=html; bindContent();}); }); });
     scope.querySelectorAll('[data-job-title-select]').forEach(sel=>{ if(sel.dataset.boundJob) return; sel.dataset.boundJob='1'; sel.addEventListener('change',()=>{ const opt=sel.selectedOptions[0]; const form=sel.closest('form'); if(!opt||!form) return; if(opt.dataset.rate) form.elements['salary_rate'].value=opt.dataset.rate; if(opt.dataset.rateType) form.elements['rate_type'].value=opt.dataset.rateType; if(opt.dataset.category) form.elements['category'].value=opt.dataset.category; if(opt.dataset.department) form.elements['department_id'].value=opt.dataset.department; }); });
     scope.querySelectorAll('[data-photo-input]').forEach(inp=>{
@@ -76,8 +111,13 @@
         const panel=inp.closest('.employee-photo-panel');
         let preview=panel?.querySelector('.employee-photo-preview');
         if(!preview || !panel) return;
-        preview.classList.add('employee-photo-preview-fallback');
-        preview.innerHTML=file ? `<span class="employee-photo-preview-label">${escapeHtml(file.name)}</span>` : '<span>Photo</span>';
+        if(!file){
+          preview.innerHTML = '<span>Photo</span>';
+          return;
+        }
+        const reader=new FileReader();
+        reader.onload=()=>{ preview.innerHTML=`<img src="${escapeHtml(reader.result)}" alt="Preview">`; };
+        reader.readAsDataURL(file);
       });
     });
     scope.querySelectorAll('[data-attendance-board]').forEach(initAttendanceBoard);
@@ -149,21 +189,58 @@
     const modalFields={};
     let activeCard=null;
     if(modalEl){
+      const modalError=modalEl.querySelector('[data-att-modal-error]');
+      const modalReasonLabel=modalEl.querySelector('[data-att-reason-label]');
       modalEl.querySelectorAll('[data-att-modal-field]').forEach(field=>{ modalFields[field.dataset.attModalField]=field; });
       modalEl.querySelector('[data-att-save-details]')?.addEventListener('click',()=>{
         if(!activeCard) return;
+        const status=modalFields.status?.value||'present';
+        const notes=(modalFields.notes?.value||'').trim();
+        if(status==='absent' && !notes){
+          if(modalError){ modalError.textContent='Please enter the reason for absence.'; modalError.classList.remove('d-none'); }
+          modalFields.notes?.focus();
+          return;
+        }
+        if(modalError){ modalError.textContent=''; modalError.classList.add('d-none'); }
         Object.entries(modalFields).forEach(([key,field])=>setCardValue(activeCard,key,field.value));
         paintCard(activeCard);
         modal?.hide();
       });
+      modalEl.addEventListener('hidden.bs.modal',()=>{ if(modalError){ modalError.textContent=''; modalError.classList.add('d-none'); } activeCard=null; });
+      modalFields.status?.addEventListener('change',()=>{
+        const status=modalFields.status?.value||'present';
+        if(modalReasonLabel) modalReasonLabel.textContent=status==='late' ? 'Reason For Late' : (status==='absent' ? 'Reason For Absence' : 'Reason / Notes');
+      });
     }
     function pad(n){ return String(n).padStart(2,'0'); }
+    function parseTime(time){
+      if(!time || !/^\d{2}:\d{2}$/.test(time)) return null;
+      const [h,m]=time.split(':').map(Number);
+      return h*60+m;
+    }
+    function formatMinutes(total){
+      total=Math.max(0, Math.round(Number(total)||0));
+      const h=Math.floor(total/60);
+      const m=total%60;
+      return `${pad(h)}:${pad(m)}`;
+    }
+    function currentMinutes(){
+      const now=new Date();
+      return now.getHours()*60+now.getMinutes();
+    }
     function addMinutes(time, mins){
       if(!time || !/^\d{2}:\d{2}$/.test(time)) return time;
       const [h,m]=time.split(':').map(Number);
       let total=h*60+m+mins;
       total=((total%(24*60))+(24*60))%(24*60);
       return `${pad(Math.floor(total/60))}:${pad(total%60)}`;
+    }
+    function computeLateMinutes(){
+      const startMinutes=parseTime(start);
+      if(startMinutes===null) return 0;
+      const threshold=startMinutes+grace;
+      const now=currentMinutes();
+      return Math.max(0, now-threshold);
     }
     function rowInputs(card){
       return {
@@ -215,16 +292,19 @@
       updateSummary();
     }
     function applyQuick(card,status){
-      setCardValue(card,'status',status);
+      const lateMinutes=computeLateMinutes();
+      const isLate=lateMinutes>0;
+      setCardValue(card,'status',status==='late' || (status==='present' && isLate) ? 'late' : status);
       if(status==='present'){
-        setCardValue(card,'time_in',start);
+        setCardValue(card,'time_in',isLate ? addMinutes(start, grace + lateMinutes) : start);
         setCardValue(card,'time_out',end);
-        setCardValue(card,'late_minutes','0');
+        setCardValue(card,'late_minutes',String(isLate ? lateMinutes : 0));
         if(!(rowInputs(card).overtime_hours?.value)) setCardValue(card,'overtime_hours','0');
       } else if(status==='late'){
-        setCardValue(card,'time_in',addMinutes(start,grace||15));
+        const computedLate=Math.max(1, lateMinutes || grace || 15);
+        setCardValue(card,'time_in',addMinutes(start, grace + computedLate));
         setCardValue(card,'time_out',end);
-        setCardValue(card,'late_minutes',String(grace||15));
+        setCardValue(card,'late_minutes',String(computedLate));
       } else if(status==='absent' || status==='rest_day' || status==='leave'){
         setCardValue(card,'time_in','');
         setCardValue(card,'time_out','');
@@ -235,6 +315,26 @@
         setCardValue(card,'time_out',addMinutes(start,240));
       }
       paintCard(card);
+      if(status==='absent'){
+        openDetails(card);
+      }
+    }
+    function openDetails(card){
+      activeCard=card;
+      const inputs=rowInputs(card);
+      Object.entries(modalFields).forEach(([key,field])=>{ field.value=inputs[key]?.value||''; });
+      const title=modalEl?.querySelector('#attendanceEntryTitle');
+      const meta=modalEl?.querySelector('#attendanceEntryMeta');
+      const modalReasonLabel=modalEl?.querySelector('[data-att-reason-label]');
+      const modalError=modalEl?.querySelector('[data-att-modal-error]');
+      if(title) title.textContent=card.dataset.employeeName||'Attendance Details';
+      if(meta) meta.textContent=card.dataset.employeeMeta||'';
+      if(modalReasonLabel){
+        const status=inputs.status?.value||'present';
+        modalReasonLabel.textContent=status==='late' ? 'Reason For Late' : (status==='absent' ? 'Reason For Absence' : 'Reason / Notes');
+      }
+      if(modalError){ modalError.textContent=''; modalError.classList.add('d-none'); }
+      modal?.show();
     }
     function updateSummary(){
       let present=0,late=0,absent=0,half=0;
@@ -270,14 +370,7 @@
         btn.addEventListener('click',()=>applyQuick(card,btn.dataset.attQuick||'present'));
       });
       card.querySelector('[data-att-open-details]')?.addEventListener('click',()=>{
-        activeCard=card;
-        const inputs=rowInputs(card);
-        Object.entries(modalFields).forEach(([key,field])=>{ field.value=inputs[key]?.value||''; });
-        const title=modalEl?.querySelector('#attendanceEntryTitle');
-        const meta=modalEl?.querySelector('#attendanceEntryMeta');
-        if(title) title.textContent=card.dataset.employeeName||'Attendance Details';
-        if(meta) meta.textContent=card.dataset.employeeMeta||'';
-        modal?.show();
+        openDetails(card);
       });
     });
     shell.querySelectorAll('[data-att-category]').forEach(btn=>{
@@ -295,7 +388,7 @@
       const d=new Date();
       const today=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
       inp.value=today;
-      inp.dispatchEvent(new Event('change'));
+      refreshAttendanceDate(today, shell);
     });
     form.querySelectorAll('[data-att-bulk]').forEach(btn=>{
       btn.addEventListener('click',()=>{

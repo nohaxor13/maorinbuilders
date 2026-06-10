@@ -178,6 +178,9 @@ function ws_hr_bootstrap(PDO $pdo): void {
 }
 ws_hr_bootstrap($pdo);
 function ws_upload_file(string $field, string $sub='employees'): ?string { if(empty($_FILES[$field]) || ($_FILES[$field]['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_OK) return null; $base=dirname(__DIR__).'/uploads/'.$sub; if(!is_dir($base)) @mkdir($base,0775,true); $name=preg_replace('/[^a-zA-Z0-9._-]+/','_',basename($_FILES[$field]['name'])); $ext=strtolower(pathinfo($name,PATHINFO_EXTENSION)); if(!in_array($ext,['jpg','jpeg','png','webp','pdf','doc','docx'],true)) return null; $fn=date('YmdHis').'_'.bin2hex(random_bytes(4)).'_'.$name; $dest=$base.'/'.$fn; if(move_uploaded_file($_FILES[$field]['tmp_name'],$dest)) return 'uploads/'.$sub.'/'.$fn; return null; }
+function ws_media_url(?string $path): string { $path=trim((string)$path); if($path==='') return ''; if(preg_match('#^(?:https?:)?//#i',$path)) return $path; return ltrim(str_replace('\\','/',$path),'/'); }
+function ws_avatar_svg(string $name): string { $initials=''; foreach(preg_split('/\s+/',trim($name)) ?: [] as $part){ if($part!=='') $initials.=strtoupper(substr($part,0,1)); if(strlen($initials)>=2) break; } $initials=$initials!=='' ? substr($initials,0,2) : 'MB'; $safeName=htmlspecialchars($name,ENT_QUOTES,'UTF-8'); $safeInitials=htmlspecialchars($initials,ENT_QUOTES,'UTF-8'); $svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="'.$safeName.'"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#dbeafe"/><stop offset="100%" stop-color="#bfdbfe"/></linearGradient></defs><rect width="96" height="96" rx="48" fill="url(#g)"/><text x="50%" y="54%" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="700" fill="#0f2748">'.$safeInitials.'</text></svg>'; return 'data:image/svg+xml;charset=UTF-8,'.rawurlencode($svg); }
+function ws_employee_avatar_src(string $name, ?string $photoPath): string { $photo=ws_media_url($photoPath); return $photo!=='' ? $photo : ws_avatar_svg($name); }
 function ws_doc_labels(): array { return ['birth_certificate'=>'Birth Certificate','nbi'=>'NBI Clearance','police_clearance'=>'Police Clearance','medical'=>'Medical Certificate','national_id'=>'National ID','license'=>'License']; }
 function ws_status_options(): array { return ['active'=>'Active','probationary'=>'Probationary','on_leave'=>'On Leave','inactive'=>'Inactive','terminated'=>'Terminated']; }
 function ws_emp_categories(): array { return ['office'=>'Office','field'=>'Field']; }
@@ -210,7 +213,7 @@ function ws_render_attendance(PDO $pdo,string $q=''): void {
   if(!preg_match('/^\d{4}-\d{2}-\d{2}$/',$date)) $date=date('Y-m-d');
   $settings=$pdo->query("SELECT * FROM mb_attendance_settings WHERE id=1")->fetch(PDO::FETCH_ASSOC);
   $emps=$pdo->query("
-    SELECT e.id,e.employee_code,e.full_name,e.category,e.salary_rate,e.daily_rate,
+    SELECT e.id,e.employee_code,e.full_name,e.category,e.salary_rate,e.daily_rate,e.photo_path,
            COALESCE(d.name,'Unassigned') department_name,
            COALESCE(NULLIF(TRIM(e.department),''), d.name, CASE WHEN e.category='field' THEN 'Field Team' ELSE 'Head Office' END) site_name
     FROM mb_employees e
@@ -270,14 +273,14 @@ function ws_render_attendance(PDO $pdo,string $q=''): void {
       <option value="">All Project Sites</option>
       <?php foreach($sites as $site): ?><option value="<?=ws_h($site)?>"><?=ws_h($site)?></option><?php endforeach; ?>
     </select>
-    <button class="btn btn-light attendance-settings-btn" data-workspace-open="attendanceSettingsModal">Settings</button>
+    <button type="button" class="btn btn-attendance btn-attendance-outline attendance-settings-btn" data-workspace-open="attendanceSettingsModal">Settings</button>
   </div>
 
   <div class="attendance-kpi-grid">
     <div class="attendance-kpi-card present">
       <div class="attendance-kpi-label">Present Today</div>
       <div class="attendance-kpi-value"><?=$presentCount?></div>
-      <div class="attendance-kpi-sub"><?=count($emps) ? round(($presentCount/max(1,count($emps)))*100) : 0?>% of total</div>
+      <div class="attendance-kpi-sub"><?=count($emps) ? round((($presentCount + $lateCount)/max(1,count($emps)))*100) : 0?>% of total</div>
     </div>
     <div class="attendance-kpi-card late">
       <div class="attendance-kpi-label">Late Today</div>
@@ -311,7 +314,7 @@ function ws_render_attendance(PDO $pdo,string $q=''): void {
       <div class="attendance-card-title">Monthly Attendance Calendar</div>
       <div class="attendance-card-head">
         <div class="attendance-month-nav"><?=date('F Y',strtotime($date))?></div>
-        <button type="button" class="btn btn-light btn-sm" data-att-today>Today</button>
+        <button type="button" class="btn btn-attendance btn-attendance-outline btn-sm" data-att-today>Today</button>
       </div>
       <div class="attendance-legend">
         <span class="present">Present</span>
@@ -354,10 +357,10 @@ function ws_render_attendance(PDO $pdo,string $q=''): void {
           <div class="attendance-card-title">Daily Attendance Sheet - <?=date('M d, Y (l)',strtotime($date))?></div>
           <div class="attendance-sheet-actions">
             <input class="form-control attendance-search-input" placeholder="Search employee..." data-att-search>
-            <button type="button" class="btn btn-primary btn-sm" data-att-bulk="present">Mark All Present</button>
-            <button type="button" class="btn btn-outline-danger btn-sm" data-att-bulk="clear">Clear Day</button>
-            <button type="button" class="btn btn-light btn-sm">Export Payroll</button>
-            <?php if($can): ?><button class="btn btn-dark btn-sm">Save Attendance</button><?php endif; ?>
+            <button type="button" class="btn btn-attendance btn-attendance-solid btn-sm" data-att-bulk="present">Mark All Present</button>
+            <button type="button" class="btn btn-attendance btn-attendance-outline btn-sm" data-att-bulk="clear">Clear Day</button>
+            <button type="button" class="btn btn-attendance btn-attendance-outline btn-sm" data-module="payroll">Export Payroll</button>
+            <?php if($can): ?><button class="btn btn-attendance btn-attendance-dark btn-sm">Save Attendance</button><?php endif; ?>
           </div>
         </div>
 
@@ -373,7 +376,7 @@ function ws_render_attendance(PDO $pdo,string $q=''): void {
             <span>Actions</span>
           </div>
 
-          <?php foreach($emps as $e): $a=$att[$e['id']]??[]; $status=(string)($a['status'] ?? 'present'); $initials=strtoupper(substr((string)$e['full_name'],0,1)); ?>
+          <?php foreach($emps as $e): $a=$att[$e['id']]??[]; $status=(string)($a['status'] ?? 'present'); $avatar=ws_employee_avatar_src((string)$e['full_name'], (string)($e['photo_path'] ?? '')); ?>
             <div class="attendance-row-pro" data-att-row data-att-card data-category="<?=ws_h((string)$e['category'])?>" data-department="<?=ws_h((string)$e['department_name'])?>" data-site="<?=ws_h((string)$e['site_name'])?>" data-search="<?=ws_h(strtolower($e['full_name'].' '.$e['employee_code'].' '.$e['department_name'].' '.$e['site_name']))?>" data-employee-name="<?=ws_h($e['full_name'])?>" data-employee-meta="<?=ws_h($e['department_name'].' - '.$e['site_name'])?>">
               <input type="hidden" name="rows[<?= (int)$e['id']?>][employee_id]" value="<?= (int)$e['id']?>">
               <input type="hidden" name="rows[<?= (int)$e['id']?>][status]" value="<?=ws_h($status)?>" data-att-input="status">
@@ -384,7 +387,7 @@ function ws_render_attendance(PDO $pdo,string $q=''): void {
               <input type="hidden" name="rows[<?= (int)$e['id']?>][notes]" value="<?=ws_h((string)($a['notes'] ?? ''))?>" data-att-input="notes">
 
               <div class="employee-col">
-                <div class="attendance-avatar pro"><?=$initials?></div>
+                <div class="attendance-avatar pro"><img src="<?=ws_h($avatar)?>" alt="<?=ws_h($e['full_name'])?>" loading="lazy"></div>
                 <div>
                   <div class="employee-code"><?=ws_h($e['employee_code'])?></div>
                   <strong><?=ws_h($e['full_name'])?></strong>
@@ -422,7 +425,7 @@ function ws_render_attendance(PDO $pdo,string $q=''): void {
         <div><span>Grace Period:</span><strong><?=ws_h($settings['late_grace_minutes'])?> min</strong></div>
         <div><span>Overtime After:</span><strong><?=ws_h($settings['overtime_after_hours'])?> hrs</strong></div>
       </div>
-      <button class="btn btn-light btn-sm mt-2" data-workspace-open="attendanceSettingsModal">View Settings</button>
+      <button type="button" class="btn btn-attendance btn-attendance-outline btn-sm mt-2" data-workspace-open="attendanceSettingsModal">View Settings</button>
     </section>
     <section class="workspace-section-card attendance-footer-card">
       <div class="attendance-card-title">Quick Summary (<?=date('M 1',strtotime($date))?> - <?=date('M d, Y',strtotime($date))?>)</div>
@@ -436,7 +439,7 @@ function ws_render_attendance(PDO $pdo,string $q=''): void {
     <section class="workspace-section-card attendance-footer-card">
       <div class="attendance-card-title">Payroll Preview</div>
       <div class="text-muted small mb-3">Based on current attendance</div>
-      <button class="btn btn-light btn-sm">View Payroll Preview</button>
+      <button type="button" class="btn btn-attendance btn-attendance-outline btn-sm" data-payroll-preview>View Payroll Preview</button>
     </section>
   </div>
 </div>
@@ -457,17 +460,18 @@ function ws_render_attendance(PDO $pdo,string $q=''): void {
           <label>Time Out<input class="form-control" type="time" data-att-modal-field="time_out"></label>
           <label>Late Minutes<input class="form-control" type="number" data-att-modal-field="late_minutes"></label>
           <label>OT Hours<input class="form-control" type="number" step="0.01" data-att-modal-field="overtime_hours"></label>
-          <label>Notes<input class="form-control" data-att-modal-field="notes"></label>
+          <label><span data-att-reason-label>Reason / Notes</span><textarea class="form-control" rows="3" data-att-modal-field="notes"></textarea></label>
         </div>
+        <div class="small text-danger mt-2 d-none" data-att-modal-error></div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" data-att-save-details>Apply</button>
+        <button type="button" class="btn btn-attendance btn-attendance-outline" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-attendance btn-attendance-dark" data-att-save-details>Apply</button>
       </div>
     </div>
   </div>
 </div>
-<div class="modal fade" id="attendanceSettingsModal"><div class="modal-dialog"><form class="modal-content" data-spa-form><input type="hidden" name="module" value="attendance"><input type="hidden" name="action" value="settings"><div class="modal-header"><h5 class="modal-title">Attendance Settings</h5><button class="btn-close" type="button" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="mb-form-grid single"><label>Work Start<input class="form-control" type="time" name="work_start" value="<?=substr($settings['work_start'],0,5)?>"></label><label>Work End<input class="form-control" type="time" name="work_end" value="<?=substr($settings['work_end'],0,5)?>"></label><label>Late Grace Minutes<input class="form-control" type="number" name="late_grace_minutes" value="<?=ws_h($settings['late_grace_minutes'])?>"></label><label>Overtime After Hours<input class="form-control" type="number" step="0.01" name="overtime_after_hours" value="<?=ws_h($settings['overtime_after_hours'])?>"></label><label>Overtime Multiplier<input class="form-control" type="number" step="0.01" name="overtime_rate_multiplier" value="<?=ws_h($settings['overtime_rate_multiplier'])?>"></label></div></div><div class="modal-footer"><button class="btn btn-primary">Save Settings</button></div></form></div></div><?php }
+<div class="modal fade" id="attendanceSettingsModal"><div class="modal-dialog"><form class="modal-content" data-spa-form><input type="hidden" name="module" value="attendance"><input type="hidden" name="action" value="settings"><div class="modal-header"><h5 class="modal-title">Attendance Settings</h5><button class="btn-close" type="button" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="mb-form-grid single"><label>Work Start<input class="form-control" type="time" name="work_start" value="<?=substr($settings['work_start'],0,5)?>"></label><label>Work End<input class="form-control" type="time" name="work_end" value="<?=substr($settings['work_end'],0,5)?>"></label><label>Late Grace Minutes<input class="form-control" type="number" name="late_grace_minutes" value="<?=ws_h($settings['late_grace_minutes'])?>"></label><label>Overtime After Hours<input class="form-control" type="number" step="0.01" name="overtime_after_hours" value="<?=ws_h($settings['overtime_after_hours'])?>"></label><label>Overtime Multiplier<input class="form-control" type="number" step="0.01" name="overtime_rate_multiplier" value="<?=ws_h($settings['overtime_rate_multiplier'])?>"></label></div></div><div class="modal-footer"><button class="btn btn-attendance btn-attendance-dark">Save Settings</button></div></form></div></div><?php }
 function ws_render_payroll(PDO $pdo,string $q=''): void { require_permission($pdo,'view_hr'); $start=$_GET['start'] ?? date('Y-m-01'); $end=$_GET['end'] ?? date('Y-m-t'); $items=ws_payroll_preview($pdo,$start,$end); $total=array_sum(array_column($items,'gross_pay')); $periods=$pdo->query("SELECT * FROM mb_payroll_periods ORDER BY period_end DESC,id DESC LIMIT 20")->fetchAll(PDO::FETCH_ASSOC); ?><div class="d-flex justify-content-between align-items-center mb-3"><div><h5 class="mb-0">Payroll</h5><div class="text-muted small">Computed from attendance status, late/absent counts, overtime hours, and employee salary rates.</div></div></div><div class="workspace-section-card mb-3"><form class="d-flex flex-wrap gap-2 align-items-end" data-payroll-filter><label class="small">Start<input class="form-control form-control-sm" type="date" name="start" value="<?=ws_h($start)?>"></label><label class="small">End<input class="form-control form-control-sm" type="date" name="end" value="<?=ws_h($end)?>"></label><button class="btn btn-outline-primary btn-sm" type="submit">Preview</button></form></div><div class="workspace-section-card"><div class="d-flex justify-content-between mb-2"><strong>Payroll Preview</strong><strong><?=ws_money($total)?></strong></div><div class="table-responsive"><table class="table table-sm workspace-table"><thead><tr><th>Employee</th><th>Rate</th><th>Present</th><th>Late</th><th>Absent</th><th>OT Hrs</th><th>Gross Pay</th></tr></thead><tbody><?php foreach($items as $i):?><tr><td><strong><?=ws_h($i['full_name'])?></strong><div class="text-muted small"><?=ws_h($i['employee_code'])?></div></td><td><?=ws_money($i['base_rate'])?></td><td><?=$i['present_days']?></td><td><?=$i['late_days']?></td><td><?=$i['absent_days']?></td><td><?=$i['overtime_hours']?></td><td><strong><?=ws_money($i['gross_pay'])?></strong></td></tr><?php endforeach;?></tbody></table></div><form data-spa-form><input type="hidden" name="module" value="payroll"><input type="hidden" name="action" value="save_period"><input type="hidden" name="period_start" value="<?=ws_h($start)?>"><input type="hidden" name="period_end" value="<?=ws_h($end)?>"><button class="btn btn-primary btn-sm">Save Payroll Period</button></form></div><h6 class="mt-4">Saved Payroll Periods</h6><div class="table-responsive workspace-table-wrap"><table class="table table-sm workspace-table"><thead><tr><th>Period</th><th>Status</th><th>Gross Pay</th><th>Created</th><th></th></tr></thead><tbody><?php foreach($periods as $p):?><tr><td><?=ws_h($p['period_start'])?> to <?=ws_h($p['period_end'])?></td><td><?=ws_h($p['status'])?></td><td><?=ws_money($p['gross_pay'])?></td><td><?=ws_h($p['created_at'])?></td><td class="text-end"><button class="btn btn-sm btn-outline-danger" data-confirm-action="Delete payroll period?" data-id="<?= (int)$p['id']?>">Delete</button></td></tr><?php endforeach;?></tbody></table></div><?php }
 function ws_payroll_preview(PDO $pdo,string $start,string $end): array { $settings=$pdo->query("SELECT * FROM mb_attendance_settings WHERE id=1")->fetch(PDO::FETCH_ASSOC); $emps=$pdo->query("SELECT * FROM mb_employees WHERE status IN ('active','probationary') ORDER BY full_name")->fetchAll(PDO::FETCH_ASSOC); $out=[]; foreach($emps as $e){ $s=$pdo->prepare("SELECT status,COUNT(*) c,COALESCE(SUM(overtime_hours),0) ot FROM mb_attendance WHERE employee_id=? AND attendance_date BETWEEN ? AND ? GROUP BY status"); $s->execute([$e['id'],$start,$end]); $present=$late=$absent=$ot=0; foreach($s as $r){ if(in_array($r['status'],['present','late'],true)) $present+=(int)$r['c']; if($r['status']==='half_day') $present+=(int)$r['c']*0.5; if($r['status']==='late') $late+=(int)$r['c']; if($r['status']==='absent') $absent+=(int)$r['c']; $ot+=(float)$r['ot']; } $rate=(float)($e['salary_rate'] ?: $e['daily_rate']); $gross=($present*$rate)+($ot*($rate/8)*(float)($settings['overtime_rate_multiplier']??1.25)); $out[]=['employee_id'=>$e['id'],'employee_code'=>$e['employee_code'],'full_name'=>$e['full_name'],'base_rate'=>$rate,'present_days'=>$present,'late_days'=>$late,'absent_days'=>$absent,'overtime_hours'=>$ot,'gross_pay'=>$gross]; } return $out; }
 
@@ -476,7 +480,7 @@ function ws_save_department(PDO $pdo): void { require_permission($pdo,'manage_em
 function ws_save_employee(PDO $pdo): void { require_permission($pdo,'manage_employees'); $id=(int)($_POST['id']??0); $code=trim($_POST['employee_code']??'') ?: ('EMP-'.date('Ymd-His')); $jobId=(int)($_POST['job_title_id']??0); $job=$jobId?($pdo->query("SELECT * FROM mb_job_titles WHERE id=".$jobId)->fetch(PDO::FETCH_ASSOC) ?: null):null; $rate=ws_num($_POST['salary_rate']??0); if($rate<=0 && $job) $rate=(float)$job['salary_rate']; $rateType=trim($_POST['rate_type']??($job['rate_type']??'daily')); $photo=ws_upload_file('photo','employees/photos'); $fields=['employee_code','full_name','employee_type','job_title','department','phone','email','daily_rate','status','notes','photo_path','birth_date','gender','civil_status','address','emergency_contact','emergency_phone','category','job_title_id','department_id','hire_date','salary_rate','rate_type']; $data=[$code,trim($_POST['full_name']??''),trim($_POST['employee_type']??''),trim($_POST['job_title']??($job['title']??'')), '', trim($_POST['phone']??''),trim($_POST['email']??''),$rate,trim($_POST['status']??'active'),trim($_POST['notes']??''),$photo,($_POST['birth_date']?:null),trim($_POST['gender']??''),trim($_POST['civil_status']??''),trim($_POST['address']??''),trim($_POST['emergency_contact']??''),trim($_POST['emergency_phone']??''),trim($_POST['category']??($job['category']??'office')),($jobId?:null),($_POST['department_id']?:null),($_POST['hire_date']?:null),$rate,$rateType]; if($id>0){ if(!$photo){$fields=array_values(array_filter($fields,fn($f)=>$f!=='photo_path')); array_splice($data,10,1);} $sets=implode(',',array_map(fn($f)=>"`$f`=?",$fields)); $pdo->prepare("UPDATE mb_employees SET $sets WHERE id=?")->execute([...$data,$id]); } else { $cols=implode(',',array_map(fn($f)=>"`$f`",$fields)); $qs=implode(',',array_fill(0,count($fields),'?')); $pdo->prepare("INSERT INTO mb_employees ($cols) VALUES ($qs)")->execute($data); $id=(int)$pdo->lastInsertId(); }
   foreach(ws_doc_labels() as $key=>$label){ $path=ws_upload_file('doc_'.$key,'employees/docs'); $status=$_POST['doc_status'][$key] ?? 'pending'; if($path || in_array($key,$_POST['doc_required']??[],true)){ $exists=$pdo->prepare("SELECT id FROM mb_employee_documents WHERE employee_id=? AND document_type=? ORDER BY id DESC LIMIT 1"); $exists->execute([$id,$key]); $docId=(int)$exists->fetchColumn(); if($docId){ if($path) $pdo->prepare("UPDATE mb_employee_documents SET file_path=?,status=?,document_title=? WHERE id=?")->execute([$path,$status,$label,$docId]); else $pdo->prepare("UPDATE mb_employee_documents SET status=?,document_title=? WHERE id=?")->execute([$status,$label,$docId]); } else $pdo->prepare("INSERT INTO mb_employee_documents (employee_id,document_type,document_title,file_path,status) VALUES (?,?,?,?,?)")->execute([$id,$key,$label,$path,$status]); } }
   ws_json(['ok'=>true,'message'=>'Employee resume saved.']); }
-function ws_save_attendance_bulk(PDO $pdo): void { require_permission($pdo,'manage_attendance'); $date=$_POST['attendance_date']??date('Y-m-d'); foreach(($_POST['rows']??[]) as $row){ $emp=(int)($row['employee_id']??0); if(!$emp) continue; $status=trim($row['status']??'present'); $payable=['present'=>1,'late'=>1,'half_day'=>0.5,'leave'=>1,'rest_day'=>0,'absent'=>0][$status] ?? 1; $pdo->prepare("INSERT INTO mb_attendance (employee_id,attendance_date,time_in,time_out,status,late_minutes,overtime_hours,payable_day,notes,created_by) VALUES (?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE time_in=VALUES(time_in),time_out=VALUES(time_out),status=VALUES(status),late_minutes=VALUES(late_minutes),overtime_hours=VALUES(overtime_hours),payable_day=VALUES(payable_day),notes=VALUES(notes)")->execute([$emp,$date,($row['time_in']?:null),($row['time_out']?:null),$status,(int)($row['late_minutes']??0),ws_num($row['overtime_hours']??0),$payable,trim($row['notes']??''),(int)$_SESSION['user_id']]); } ws_json(['ok'=>true,'message'=>'Attendance saved.']); }
+function ws_save_attendance_bulk(PDO $pdo): void { require_permission($pdo,'manage_attendance'); $date=$_POST['attendance_date']??date('Y-m-d'); foreach(($_POST['rows']??[]) as $row){ $emp=(int)($row['employee_id']??0); if(!$emp) continue; $status=trim($row['status']??'present'); $notes=trim((string)($row['notes']??'')); if(in_array($status,['late','absent'],true) && $notes==='') ws_json(['ok'=>false,'message'=>$status==='late'?'Please enter why the employee is late before saving.':'Please enter the reason for absence before saving.'],422); $payable=['present'=>1,'late'=>1,'half_day'=>0.5,'leave'=>1,'rest_day'=>0,'absent'=>0][$status] ?? 1; $pdo->prepare("INSERT INTO mb_attendance (employee_id,attendance_date,time_in,time_out,status,late_minutes,overtime_hours,payable_day,notes,created_by) VALUES (?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE time_in=VALUES(time_in),time_out=VALUES(time_out),status=VALUES(status),late_minutes=VALUES(late_minutes),overtime_hours=VALUES(overtime_hours),payable_day=VALUES(payable_day),notes=VALUES(notes)")->execute([$emp,$date,($row['time_in']?:null),($row['time_out']?:null),$status,(int)($row['late_minutes']??0),ws_num($row['overtime_hours']??0),$payable,$notes,(int)$_SESSION['user_id']]); } ws_json(['ok'=>true,'message'=>'Attendance saved.']); }
 function ws_save_attendance_settings(PDO $pdo): void { require_permission($pdo,'manage_attendance'); $pdo->prepare("UPDATE mb_attendance_settings SET work_start=?,work_end=?,late_grace_minutes=?,overtime_after_hours=?,overtime_rate_multiplier=? WHERE id=1")->execute([($_POST['work_start']??'08:00'),($_POST['work_end']??'17:00'),(int)($_POST['late_grace_minutes']??15),ws_num($_POST['overtime_after_hours']??8),ws_num($_POST['overtime_rate_multiplier']??1.25)]); ws_json(['ok'=>true,'message'=>'Attendance settings saved.']); }
 function ws_save_payroll_period(PDO $pdo): void { require_permission($pdo,'manage_employees'); $start=$_POST['period_start']??date('Y-m-01'); $end=$_POST['period_end']??date('Y-m-t'); $items=ws_payroll_preview($pdo,$start,$end); $total=array_sum(array_column($items,'gross_pay')); $pdo->prepare("INSERT INTO mb_payroll_periods (period_start,period_end,title,status,gross_pay,created_by) VALUES (?,?,?,'draft',?,?)")->execute([$start,$end,'Payroll '.$start.' to '.$end,$total,(int)$_SESSION['user_id']]); $pid=(int)$pdo->lastInsertId(); foreach($items as $i){ $pdo->prepare("INSERT INTO mb_payroll_items (payroll_id,employee_id,base_rate,present_days,late_days,absent_days,overtime_hours,gross_pay) VALUES (?,?,?,?,?,?,?,?)")->execute([$pid,$i['employee_id'],$i['base_rate'],$i['present_days'],$i['late_days'],$i['absent_days'],$i['overtime_hours'],$i['gross_pay']]); } ws_json(['ok'=>true,'message'=>'Payroll period saved.']); }
 
