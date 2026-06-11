@@ -7,7 +7,7 @@ function mb_workspace_nav(PDO $pdo): array {
         ['label'=>'Projects','href'=>mb_base_url('modules/projects/index.php'),'icon'=>'▦','permission'=>'view_projects'],
         ['label'=>'Estimates','href'=>mb_base_url('modules/estimates/index.php'),'icon'=>'◇','permission'=>'view_estimates'],
         ['label'=>'Proposals','href'=>mb_base_url('modules/proposals/index.php'),'icon'=>'▣','permission'=>'view_proposals'],
-        ['label'=>'Plans','href'=>mb_base_url('modules/documents/plans.php'),'icon'=>'⌗','permission'=>'view_plans'],
+        ['label'=>'Plans','href'=>mb_base_url('workspace.php#plans'),'icon'=>'⌗','permission'=>'view_plans'],
         ['section'=>'Finance'],
         ['label'=>'Purchase Journal','href'=>mb_base_url('purchase_list.php'),'icon'=>'₱','permission'=>'view_journal'],
         ['label'=>'Expenses','href'=>mb_base_url('modules/finance/index.php'),'icon'=>'◉','permission'=>'view_finance'],

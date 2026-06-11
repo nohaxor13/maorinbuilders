@@ -1105,9 +1105,9 @@ include __DIR__ . '/templates/header.php';
     </div>
   </div>
 
-  <div class="modal fade" id="staffModal" tabindex="-1" aria-hidden="true">
+  <div class="modal fade mb-admin-modal" id="staffModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
-      <div class="modal-content border-0 shadow">
+      <div class="modal-content">
         <form method="post" enctype="multipart/form-data">
           <div class="modal-header">
             <div>
@@ -1147,9 +1147,9 @@ include __DIR__ . '/templates/header.php';
     </div>
   </div>
 
-  <div class="modal fade" id="staffEditModal" tabindex="-1" aria-hidden="true">
+  <div class="modal fade mb-admin-modal" id="staffEditModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
-      <div class="modal-content border-0 shadow">
+      <div class="modal-content">
         <form method="post">
           <div class="modal-header">
             <div>
@@ -1189,9 +1189,9 @@ include __DIR__ . '/templates/header.php';
     </div>
   </div>
 
-  <div class="modal fade" id="passwordModal" tabindex="-1" aria-hidden="true">
+  <div class="modal fade mb-admin-modal" id="passwordModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content border-0 shadow">
+      <div class="modal-content">
         <form method="post">
           <div class="modal-header">
             <h5 class="modal-title">Reset password</h5>
@@ -1215,9 +1215,9 @@ include __DIR__ . '/templates/header.php';
     </div>
   </div>
 
-  <div class="modal fade" id="maintenanceModal" tabindex="-1" aria-hidden="true">
+  <div class="modal fade mb-admin-modal" id="maintenanceModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
-      <div class="modal-content border-0 shadow">
+      <div class="modal-content">
         <form method="post">
           <div class="modal-header">
             <div>
@@ -1255,7 +1255,7 @@ include __DIR__ . '/templates/header.php';
     </div>
   </div>
 
-  <div class="modal fade" id="projectModal" tabindex="-1" aria-hidden="true">
+  <div class="modal fade mb-admin-modal" id="projectModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
       <div class="modal-content">
         <form method="post" enctype="multipart/form-data">
@@ -1281,7 +1281,7 @@ include __DIR__ . '/templates/header.php';
                 <input class="form-control" type="file" name="cover_upload" accept="image/*">
                 <div class="form-text">Leave blank to keep the current cover.</div>
                 <div class="mt-2 d-none" id="project_cover_preview_wrap">
-                  <div class="border rounded-3 p-2 bg-light d-inline-flex flex-column gap-2" style="width: 180px;">
+                  <div class="mb-modal-preview d-inline-flex flex-column gap-2" style="width: 180px;">
                     <img id="project_cover_preview" src="" alt="Current cover" class="img-fluid rounded" style="height:110px; object-fit:cover; width:100%;">
                     <div class="d-flex gap-2">
                       <a id="project_cover_link" href="#" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary flex-fill">View</a>
@@ -1295,7 +1295,7 @@ include __DIR__ . '/templates/header.php';
                 <input type="hidden" name="remove_before_image" id="project_remove_before_image" value="0">
                 <input class="form-control" type="file" name="before_upload" accept="image/*">
                 <div class="mt-2 d-none" id="project_before_preview_wrap">
-                  <div class="border rounded-3 p-2 bg-light d-inline-flex flex-column gap-2" style="width: 180px;">
+                  <div class="mb-modal-preview d-inline-flex flex-column gap-2" style="width: 180px;">
                     <img id="project_before_preview" src="" alt="Current before image" class="img-fluid rounded" style="height:110px; object-fit:cover; width:100%;">
                     <div class="d-flex gap-2">
                       <a id="project_before_link" href="#" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary flex-fill">View</a>
@@ -1309,7 +1309,7 @@ include __DIR__ . '/templates/header.php';
                 <input type="hidden" name="remove_after_image" id="project_remove_after_image" value="0">
                 <input class="form-control" type="file" name="after_upload" accept="image/*">
                 <div class="mt-2 d-none" id="project_after_preview_wrap">
-                  <div class="border rounded-3 p-2 bg-light d-inline-flex flex-column gap-2" style="width: 180px;">
+                  <div class="mb-modal-preview d-inline-flex flex-column gap-2" style="width: 180px;">
                     <img id="project_after_preview" src="" alt="Current after image" class="img-fluid rounded" style="height:110px; object-fit:cover; width:100%;">
                     <div class="d-flex gap-2">
                       <a id="project_after_link" href="#" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary flex-fill">View</a>
@@ -1343,7 +1343,7 @@ include __DIR__ . '/templates/header.php';
     </div>
   </div>
 
-  <div class="modal fade" id="serviceModal" tabindex="-1" aria-hidden="true">
+  <div class="modal fade mb-admin-modal" id="serviceModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
       <div class="modal-content">
         <form method="post">

@@ -1,0 +1,27 @@
+{
+  "name": "maorinbuilders",
+  "version": "1.0.0",
+  "description": "Self-contained Import/Export for **purchase_entries** using PhpSpreadsheet.\r Works with *reference.xlsx* layout. Scans for the header row, so extra rows/merged cells above are OK.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nohaxor13/maorinbuilders.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/nohaxor13/maorinbuilders/issues"
+  },
+  "homepage": "https://github.com/nohaxor13/maorinbuilders#readme",
+  "dependencies": {
+    "playwright": "^1.60.0"
+  }
+}

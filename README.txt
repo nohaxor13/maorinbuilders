@@ -1,0 +1,1 @@
+Copy account_dashboard.php to C:\xampp\htdocs\maorinbuilders\account_dashboard.php. Copy assets/css and assets/js into the same project folders. Run SQL only if inquiries table does not exist. Hard refresh Ctrl+F5.

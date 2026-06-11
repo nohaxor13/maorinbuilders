@@ -739,6 +739,34 @@ if (!function_exists('ensure_maorin_workspace_tables')) {
             INDEX idx_mb_proposals_project (project_id),
             INDEX idx_mb_proposals_estimate (estimate_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $mbProposalColumns = [
+            'location' => "VARCHAR(255) NULL",
+            'project_type' => "VARCHAR(80) NULL",
+            'payment_terms' => "TEXT NULL",
+            'exclusions' => "TEXT NULL",
+            'timeline_days' => "INT NOT NULL DEFAULT 0"
+        ];
+        $proposalColCheck = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mb_proposals' AND COLUMN_NAME = ?");
+        foreach ($mbProposalColumns as $col => $def) {
+            $proposalColCheck->execute([$col]);
+            if ((int)$proposalColCheck->fetchColumn() === 0) {
+                $pdo->exec("ALTER TABLE mb_proposals ADD COLUMN `{$col}` {$def}");
+            }
+        }
+        $pdo->exec("CREATE TABLE IF NOT EXISTS proposal_letter_settings (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            proposal_id INT NOT NULL,
+            header_mode VARCHAR(20) NOT NULL DEFAULT 'text',
+            header_title VARCHAR(180) NULL,
+            header_subtitle VARCHAR(180) NULL,
+            header_line1 VARCHAR(255) NULL,
+            header_line2 VARCHAR(255) NULL,
+            header_image_path VARCHAR(255) NULL,
+            show_header TINYINT(1) NOT NULL DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_proposal_letter_settings_proposal (proposal_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         $pdo->exec("CREATE TABLE IF NOT EXISTS mb_plan_files (
             id INT AUTO_INCREMENT PRIMARY KEY,
             project_id INT NULL,
@@ -747,6 +775,15 @@ if (!function_exists('ensure_maorin_workspace_tables')) {
             revision VARCHAR(40) NULL,
             status VARCHAR(32) NOT NULL DEFAULT 'draft',
             file_path VARCHAR(255) NULL,
+            file_name VARCHAR(180) NULL,
+            file_type VARCHAR(20) NULL,
+            drawing_scale VARCHAR(20) NOT NULL DEFAULT '1:100',
+            legend_json LONGTEXT NULL,
+            measurements_json LONGTEXT NULL,
+            materials_json LONGTEXT NULL,
+            computed_area DECIMAL(14,3) NOT NULL DEFAULT 0,
+            computed_quantity DECIMAL(14,3) NOT NULL DEFAULT 0,
+            computed_material_cost DECIMAL(14,2) NOT NULL DEFAULT 0,
             notes TEXT NULL,
             created_by INT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
