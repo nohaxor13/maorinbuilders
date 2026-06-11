@@ -75,11 +75,25 @@ if (!function_exists('is_logged_in')) {
           <div class="navbar-nav me-auto mb-2 mb-lg-0 align-items-lg-center gap-lg-1">
             <?php if (is_logged_in()): ?>
               <div class="nav-section-label d-lg-none">Workspace</div>
+              <?php
+                $scriptName = basename($_SERVER['SCRIPT_NAME'] ?? '');
+                $journalType = $_GET['type'] ?? '';
+                $isJournalPage = in_array($scriptName, ['purchase_list.php','accounting_journals.php','accounting_journal_entry.php'], true);
+              ?>
               <?php if (isset($pdo) && function_exists('current_user_can') && current_user_can($pdo, 'create_journal')): ?>
-                <a class="nav-link nav-pill<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'purchase_new.php' ? ' active' : '' ?>" href="purchase_new.php">New Entry</a>
+                <button class="nav-link nav-pill border-0 bg-transparent<?= in_array($scriptName, ['purchase_new.php','accounting_journal_entry.php'], true) ? ' active' : '' ?>" type="button" data-bs-toggle="modal" data-bs-target="#journalEntryChoiceModal">New Entry</button>
               <?php endif; ?>
               <?php if (isset($pdo) && function_exists('current_user_can') && current_user_can($pdo, 'view_journal')): ?>
-                <a class="nav-link nav-pill<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'purchase_list.php' ? ' active' : '' ?>" href="purchase_list.php">Journal</a>
+                <div class="nav-item dropdown">
+                  <a class="nav-link nav-pill dropdown-toggle<?= $isJournalPage ? ' active' : '' ?>" href="purchase_list.php" role="button" data-bs-toggle="dropdown" aria-expanded="false">Journal</a>
+                  <ul class="dropdown-menu dropdown-menu-dark shadow">
+                    <li><a class="dropdown-item<?= $scriptName === 'purchase_list.php' ? ' active' : '' ?>" href="purchase_list.php">Purchase Journal</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item<?= in_array($scriptName, ['accounting_journals.php','accounting_journal_entry.php'], true) && $journalType === 'general' ? ' active' : '' ?>" href="accounting_journals.php?type=general">General Journal</a></li>
+                    <li><a class="dropdown-item<?= in_array($scriptName, ['accounting_journals.php','accounting_journal_entry.php'], true) && $journalType === 'sales' ? ' active' : '' ?>" href="accounting_journals.php?type=sales">Sales Journal</a></li>
+                    <li><a class="dropdown-item<?= in_array($scriptName, ['accounting_journals.php','accounting_journal_entry.php'], true) && $journalType === 'cash_disbursements' ? ' active' : '' ?>" href="accounting_journals.php?type=cash_disbursements">Cash Disbursements Journal</a></li>
+                  </ul>
+                </div>
               <?php endif; ?>
               <?php if (isset($pdo) && function_exists('current_user_can') && current_user_can($pdo, 'view_account_dashboard')): ?>
                 <a class="nav-link nav-pill<?= basename($_SERVER['SCRIPT_NAME'] ?? '') === 'account_dashboard.php' ? ' active' : '' ?>" href="account_dashboard.php">Account Dashboard</a>
@@ -118,6 +132,39 @@ if (!function_exists('is_logged_in')) {
         </div>
       </div>
     </nav>
+
+    <?php if (is_logged_in() && isset($pdo) && function_exists('current_user_can') && current_user_can($pdo, 'create_journal')): ?>
+      <div class="modal fade" id="journalEntryChoiceModal" tabindex="-1" aria-labelledby="journalEntryChoiceModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content border-0 shadow">
+            <div class="modal-header">
+              <h5 class="modal-title" id="journalEntryChoiceModalLabel">Choose Journal Entry</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="list-group">
+                <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" href="purchase_new.php">
+                  <span><strong>Purchase Journal</strong><br><small class="text-muted">Supplier purchases and VAT/NONVAT purchase entries</small></span>
+                  <span class="badge text-bg-light">Open</span>
+                </a>
+                <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" href="accounting_journal_entry.php?type=general">
+                  <span><strong>General Journal</strong><br><small class="text-muted">Adjustments, accruals, reclassifications, and manual entries</small></span>
+                  <span class="badge text-bg-light">Open</span>
+                </a>
+                <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" href="accounting_journal_entry.php?type=sales">
+                  <span><strong>Sales Journal</strong><br><small class="text-muted">Customer sales, invoices, and collections</small></span>
+                  <span class="badge text-bg-light">Open</span>
+                </a>
+                <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" href="accounting_journal_entry.php?type=cash_disbursements">
+                  <span><strong>Cash Disbursements Journal</strong><br><small class="text-muted">Cash payments, checks, and outgoing funds</small></span>
+                  <span class="badge text-bg-light">Open</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    <?php endif; ?>
 
     <?php $pageContainerClass = isset($pageContainerClass) && is_string($pageContainerClass) && $pageContainerClass !== '' ? $pageContainerClass : 'container'; ?>
     <div class="<?= htmlspecialchars($pageContainerClass, ENT_QUOTES, 'UTF-8') ?> py-3">
