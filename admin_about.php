@@ -5,6 +5,7 @@ require __DIR__ . '/config.php';
 require __DIR__ . '/helpers.php';
 redirect_if_not_logged_in();
 require_permission($pdo, 'manage_company_content');
+require_feature($pdo, 'company_content');
 
 if (!function_exists('admin_about_company_file')) {
   function admin_about_company_file(): string {

@@ -3,6 +3,7 @@ declare(strict_types=1);
 require __DIR__ . '/../config.php';
 require __DIR__ . '/../helpers.php';
 ensure_client_portal_tables($pdo);
+require_feature($pdo, 'client_portal');
 redirect_client_if_not_logged_in();
 
 $id = (int)($_GET['id'] ?? 0);

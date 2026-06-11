@@ -1,7 +1,10 @@
 <?php
-$title = 'Services — Maorin Builders';
-require __DIR__ . '/templates/header.php';
+require __DIR__ . '/../config.php';
+require __DIR__ . '/../helpers.php';
 ensure_content_catalog_tables($pdo);
+$title = 'Services — Maorin Builders';
+require_feature($pdo, 'public_site');
+require __DIR__ . '/templates/header.php';
 
 $services = $pdo->query("SELECT slug, name, desc_text AS desc, href, range_text AS range, timeline_text AS timeline FROM website_services ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
 if (!$services) {

@@ -525,6 +525,101 @@ if (!function_exists('site_setting_set')) {
     }
 }
 
+if (!function_exists('feature_catalog')) {
+    function feature_catalog(): array {
+        return [
+            'modules' => [
+                'account_dashboard' => 'Account Dashboard',
+                'workspace_overview' => 'Workspace Overview',
+                'projects' => 'Projects',
+                'estimates' => 'Estimates',
+                'proposals' => 'Proposals',
+                'plans' => 'Plans',
+                'finance' => 'Finance',
+                'hr' => 'HR',
+                'inventory' => 'Inventory',
+                'documents' => 'Documents',
+                'reports' => 'Reports',
+                'client_portal' => 'Client Portal',
+                'inquiries' => 'Inquiries',
+                'company_content' => 'Company Content',
+                'public_site' => 'Public Site',
+            ],
+            'sections' => [
+                'account_security' => 'Account Security',
+                'account_quick_actions' => 'Account Quick Actions',
+                'account_recent_entries' => 'Account Recent Entries',
+                'account_activity' => 'Account Activity',
+                'public_hero' => 'Public Home Hero',
+                'public_services_grid' => 'Public Services Grid',
+                'public_projects_grid' => 'Public Projects Grid',
+                'public_testimonials' => 'Public Testimonials',
+                'public_contact_methods' => 'Public Contact Methods',
+                'client_projects' => 'Client Portal Projects',
+                'client_files' => 'Client Portal Files',
+                'client_payments' => 'Client Portal Payments',
+            ],
+        ];
+    }
+}
+
+if (!function_exists('feature_flags_defaults')) {
+    function feature_flags_defaults(): array {
+        $defaults = [];
+        foreach (feature_catalog() as $group) {
+            foreach ($group as $key => $label) {
+                $defaults[$key] = true;
+            }
+        }
+        return $defaults;
+    }
+}
+
+if (!function_exists('feature_flags_get')) {
+    function feature_flags_get(PDO $pdo): array {
+        ensure_site_settings_table($pdo);
+        $raw = (string)site_setting_get($pdo, 'feature_flags', '');
+        $decoded = json_decode($raw, true);
+        $flags = feature_flags_defaults();
+        if (is_array($decoded)) {
+            foreach ($decoded as $key => $value) {
+                if (array_key_exists($key, $flags)) {
+                    $flags[$key] = (bool)$value;
+                }
+            }
+        }
+        return $flags;
+    }
+}
+
+if (!function_exists('feature_flags_set')) {
+    function feature_flags_set(PDO $pdo, array $flags): void {
+        $catalog = feature_flags_defaults();
+        $normalized = [];
+        foreach ($catalog as $key => $default) {
+            $normalized[$key] = !empty($flags[$key]);
+        }
+        site_setting_set($pdo, 'feature_flags', json_encode($normalized, JSON_UNESCAPED_SLASHES));
+    }
+}
+
+if (!function_exists('feature_is_enabled')) {
+    function feature_is_enabled(PDO $pdo, string $key): bool {
+        $flags = feature_flags_get($pdo);
+        return array_key_exists($key, $flags) ? (bool)$flags[$key] : true;
+    }
+}
+
+if (!function_exists('require_feature')) {
+    function require_feature(PDO $pdo, string $key): void {
+        if (!feature_is_enabled($pdo, $key)) {
+            http_response_code(403);
+            echo '<div style="padding:24px;font-family:system-ui,sans-serif"><h1>Feature disabled</h1><p>This feature has been disabled by an administrator.</p></div>';
+            exit;
+        }
+    }
+}
+
 if (!function_exists('maintenance_mode_is_enabled')) {
     function maintenance_mode_is_enabled(PDO $pdo): bool {
         return (string)site_setting_get($pdo, 'maintenance_mode', '0') === '1';

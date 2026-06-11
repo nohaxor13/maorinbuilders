@@ -3,6 +3,7 @@ declare(strict_types=1);
 require __DIR__ . '/../config.php';
 require __DIR__ . '/../helpers.php';
 ensure_client_portal_tables($pdo);
+require_feature($pdo, 'client_portal');
 redirect_client_if_not_logged_in();
 
 $project_id = trim((string)($_GET['project_id'] ?? ''));
@@ -76,6 +77,7 @@ include __DIR__ . '/templates/header.php';
       <?php endif; ?>
     </div>
 
+    <?php if (feature_is_enabled($pdo, 'client_files')): ?>
     <div class="kpi mt-3">
       <div class="muted small mb-2">Project Files</div>
       <?php if (!$files): ?>
@@ -94,6 +96,7 @@ include __DIR__ . '/templates/header.php';
         </div>
       <?php endif; ?>
     </div>
+    <?php endif; ?>
   </div>
 
   <div class="col-lg-8">
@@ -127,6 +130,7 @@ include __DIR__ . '/templates/header.php';
       <?php endif; ?>
     </div>
 
+    <?php if (feature_is_enabled($pdo, 'client_payments')): ?>
     <div class="kpi mt-3">
       <h5 class="mb-2">Payment Schedule</h5>
       <?php if (!$payments): ?>
@@ -166,6 +170,7 @@ include __DIR__ . '/templates/header.php';
         </div>
       <?php endif; ?>
     </div>
+    <?php endif; ?>
   </div>
 </div>
 

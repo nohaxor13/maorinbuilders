@@ -147,40 +147,47 @@ $__logoPath = pub_url('/assets/img/company-logo.png');
     <div class="collapse navbar-collapse" id="pubNav">
       <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
 
+        <?php if (!function_exists('feature_is_enabled') || feature_is_enabled($pdo, 'public_site')): ?>
         <li class="nav-item">
           <?php $href = pub_url('/public/about.php'); ?>
           <a class="nav-link<?= pub_is_active($href) ? ' active' : '' ?>" href="<?= htmlspecialchars($href, ENT_QUOTES, 'UTF-8') ?>">About</a>
         </li>
-
+        <?php if (function_exists('feature_is_enabled') && feature_is_enabled($pdo, 'public_services_grid')): ?>
         <li class="nav-item">
           <?php $href = pub_url('/public/services.php'); ?>
           <a class="nav-link<?= pub_is_active($href) ? ' active' : '' ?>" href="<?= htmlspecialchars($href, ENT_QUOTES, 'UTF-8') ?>">Services</a>
         </li>
-
+        <?php endif; ?>
+        <?php if (function_exists('feature_is_enabled') && feature_is_enabled($pdo, 'public_projects_grid')): ?>
         <li class="nav-item">
           <?php $href = pub_url('/public/projects.php'); ?>
           <a class="nav-link<?= pub_is_active($href) ? ' active' : '' ?>" href="<?= htmlspecialchars($href, ENT_QUOTES, 'UTF-8') ?>">Projects</a>
         </li>
-
+        <?php endif; ?>
         <li class="nav-item">
           <?php $href = pub_url('/public/estimator.php'); ?>
           <a class="nav-link<?= pub_is_active($href) ? ' active' : '' ?>" href="<?= htmlspecialchars($href, ENT_QUOTES, 'UTF-8') ?>">Estimator</a>
         </li>
-
+        <?php if (function_exists('feature_is_enabled') && feature_is_enabled($pdo, 'public_testimonials')): ?>
         <li class="nav-item">
           <?php $href = pub_url('/public/testimonials.php'); ?>
           <a class="nav-link<?= pub_is_active($href) ? ' active' : '' ?>" href="<?= htmlspecialchars($href, ENT_QUOTES, 'UTF-8') ?>">Testimonials</a>
         </li>
-
+        <?php endif; ?>
+        <?php if (!function_exists('feature_is_enabled') || feature_is_enabled($pdo, 'client_portal')): ?>
         <li class="nav-item">
           <?php $href = pub_url('/client/login.php'); ?>
           <a class="nav-link<?= pub_is_active($href) ? ' active' : '' ?>" href="<?= htmlspecialchars($href, ENT_QUOTES, 'UTF-8') ?>">Client Portal</a>
         </li>
+        <?php endif; ?>
+        <?php endif; ?>
 
+        <?php if (!function_exists('feature_is_enabled') || feature_is_enabled($pdo, 'public_contact_methods')): ?>
         <li class="nav-item">
           <?php $href = pub_url('/public/contact.php'); ?>
           <a class="nav-link<?= pub_is_active($href) ? ' active' : '' ?>" href="<?= htmlspecialchars($href, ENT_QUOTES, 'UTF-8') ?>">Contact</a>
         </li>
+        <?php endif; ?>
 
         <li class="nav-item">
           <?php $href = pub_url('/login.php'); ?>

@@ -3,6 +3,7 @@ declare(strict_types=1);
 require __DIR__ . '/../config.php';
 require __DIR__ . '/../helpers.php';
 ensure_client_portal_tables($pdo);
+require_feature($pdo, 'client_portal');
 redirect_client_if_not_logged_in();
 
 $projectsData = require __DIR__ . '/../public/data/projects.php';
@@ -20,6 +21,9 @@ foreach ($projectIds as $pid) {
 
 include __DIR__ . '/templates/header.php';
 ?>
+<?php if (!feature_is_enabled($pdo, 'client_projects')): ?>
+  <div class="alert alert-info">This section is currently disabled by the administrator.</div>
+<?php else: ?>
 <h3 class="mb-3">My Projects</h3>
 
 <?php if (!$my): ?>
@@ -65,4 +69,5 @@ include __DIR__ . '/templates/header.php';
   </div>
 <?php endif; ?>
 
+<?php endif; ?>
 <?php include __DIR__ . '/templates/footer.php'; ?>

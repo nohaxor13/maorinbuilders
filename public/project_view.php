@@ -5,6 +5,7 @@ require __DIR__ . '/../config.php';
 require __DIR__ . '/../helpers.php';
 
 ensure_content_catalog_tables($pdo);
+require_feature($pdo, 'public_site');
 
 if (!function_exists('project_media_url')) {
   function project_media_url(?string $path, string $fallback = ''): string {

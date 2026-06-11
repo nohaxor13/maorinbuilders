@@ -203,6 +203,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
       $maintenanceSaved = true;
       $flashSuccess = 'Maintenance settings updated.';
+    } elseif ($action === 'save_feature_flags') {
+      $incoming = (array)($_POST['features'] ?? []);
+      $flags = feature_flags_defaults();
+      foreach ($flags as $key => $_default) {
+        $flags[$key] = !empty($incoming[$key]);
+      }
+      feature_flags_set($pdo, $flags);
+      $flashSuccess = 'Feature toggles updated.';
     } elseif ($action === 'create_role') {
       $slug = strtolower(trim((string)($_POST['slug'] ?? '')));
       $name = trim((string)($_POST['name'] ?? ''));
@@ -689,6 +697,8 @@ foreach ($rolePermRows as $row) {
   $rolePermissions[(string)$row['role_slug']][] = (string)$row['permission_key'];
 }
 $roleOptions = $roles;
+$featureCatalog = feature_catalog();
+$featureFlags = feature_flags_get($pdo);
 
 $title = 'Admin Dashboard';
 include __DIR__ . '/templates/header.php';
@@ -773,6 +783,7 @@ include __DIR__ . '/templates/header.php';
 
   <ul class="nav nav-pills gap-2 admin-tabs mb-3" id="adminTabs" role="tablist">
     <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-overview" type="button" role="tab">Overview</button></li>
+    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-features" type="button" role="tab">Feature Toggles</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-roles" type="button" role="tab">Roles</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-staff" type="button" role="tab">Staff</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-activity" type="button" role="tab">Activity</button></li>
@@ -892,6 +903,63 @@ include __DIR__ . '/templates/header.php';
                   <?php endif; ?>
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade" id="tab-features" role="tabpanel">
+      <div class="row g-3">
+        <div class="col-lg-5">
+          <div class="card admin-card h-100">
+            <div class="card-header bg-white fw-semibold">Feature controls</div>
+            <div class="card-body">
+              <p class="text-secondary small mb-3">Turn features off when you want to hide an area from menus and block direct access.</p>
+              <form method="post" class="d-grid gap-3">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="action" value="save_feature_flags">
+                <div>
+                  <div class="fw-semibold mb-2">Module-wide</div>
+                  <div class="row g-2">
+                    <?php foreach ($featureCatalog['modules'] as $key => $label): ?>
+                      <div class="col-12">
+                        <div class="form-check form-switch">
+                          <input class="form-check-input" type="checkbox" role="switch" name="features[<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>]" id="feature_<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>" <?= !empty($featureFlags[$key]) ? 'checked' : '' ?>>
+                          <label class="form-check-label" for="feature_<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?></label>
+                        </div>
+                      </div>
+                    <?php endforeach; ?>
+                  </div>
+                </div>
+                <div>
+                  <div class="fw-semibold mb-2">Sections</div>
+                  <div class="row g-2">
+                    <?php foreach ($featureCatalog['sections'] as $key => $label): ?>
+                      <div class="col-12">
+                        <div class="form-check form-switch">
+                          <input class="form-check-input" type="checkbox" role="switch" name="features[<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>]" id="feature_<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>" <?= !empty($featureFlags[$key]) ? 'checked' : '' ?>>
+                          <label class="form-check-label" for="feature_<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?></label>
+                        </div>
+                      </div>
+                    <?php endforeach; ?>
+                  </div>
+                </div>
+                <div>
+                  <button class="btn btn-primary">Save feature toggles</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-7">
+          <div class="card admin-card h-100">
+            <div class="card-header bg-white fw-semibold">What this controls</div>
+            <div class="card-body">
+              <div class="d-flex justify-content-between border-bottom py-2"><span>Navigation</span><strong>Hidden when disabled</strong></div>
+              <div class="d-flex justify-content-between border-bottom py-2"><span>Direct access</span><strong>Blocked with notice</strong></div>
+              <div class="d-flex justify-content-between border-bottom py-2"><span>Account Security</span><strong>First section toggle</strong></div>
+              <div class="d-flex justify-content-between py-2"><span>Storage</span><strong>site_settings</strong></div>
             </div>
           </div>
         </div>

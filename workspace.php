@@ -35,7 +35,7 @@ $name = $_SESSION['name'] ?? 'User';
           <li class="nav-item dropdown">
             <button class="nav-link dropdown-toggle" data-bs-toggle="dropdown" type="button">More Workspace</button>
             <ul class="dropdown-menu shadow-sm">
-              <?php if (current_user_can($pdo, 'view_plans')): ?><li><button class="dropdown-item" type="button" data-module="plans">Plans</button></li><?php endif; ?>
+              <?php if (current_user_can($pdo, 'view_plans') && feature_is_enabled($pdo, 'plans')): ?><li><button class="dropdown-item" type="button" data-module="plans">Plans</button></li><?php endif; ?>
               <?php if (current_user_can($pdo, 'view_finance')): ?><li><button class="dropdown-item" type="button" data-module="expenses">Expenses</button></li><li><button class="dropdown-item" type="button" data-module="invoices">Invoices</button></li><?php endif; ?>
               <?php if (current_user_can($pdo, 'view_hr')): ?><li><button class="dropdown-item" type="button" data-module="employees">Employees</button></li><li><button class="dropdown-item" type="button" data-module="attendance">Attendance</button></li><li><button class="dropdown-item" type="button" data-module="payroll">Payroll</button></li><?php if (current_user_can($pdo, 'manage_employees')): ?><li><hr class="dropdown-divider"></li><li><button class="dropdown-item" type="button" data-module="departments">Departments</button></li><li><button class="dropdown-item" type="button" data-module="job_titles">Job Titles & Rates</button></li><?php endif; ?><?php endif; ?>
               <?php if (current_user_can($pdo, 'view_inventory')): ?><li><button class="dropdown-item" type="button" data-module="inventory">Inventory</button></li><?php endif; ?>

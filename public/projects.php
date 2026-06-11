@@ -1,7 +1,11 @@
 <?php
-$title = 'Projects — Maorin Builders';
-require __DIR__ . '/templates/header.php';
+require __DIR__ . '/../config.php';
+require __DIR__ . '/../helpers.php';
 ensure_content_catalog_tables($pdo);
+$title = 'Projects — Maorin Builders';
+require_feature($pdo, 'public_site');
+$projectHeader = __DIR__ . '/templates/header.php';
+require $projectHeader;
 $projects = $pdo->query("SELECT slug AS id, title, location, year, type, status, cover, summary FROM website_projects ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
 if (!$projects) {
   $projects = require __DIR__ . '/data/projects.php';
