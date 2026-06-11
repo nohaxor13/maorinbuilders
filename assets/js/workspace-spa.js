@@ -215,6 +215,7 @@
     scope.querySelectorAll('[data-attendance-board]').forEach(initAttendanceBoard);
     scope.querySelectorAll('[data-estimate-builder]').forEach(initEstimateBuilder);
     scope.querySelectorAll('[data-proposal-builder]').forEach(initProposalBuilder);
+    scope.querySelectorAll('[data-plan-takeoff]').forEach(initPlanTakeoff);
   }
   async function submitSpaForm(e){
     e.preventDefault(); const form=e.currentTarget; const fd=new FormData(form); fd.append('csrf_token',window.MB_WORKSPACE.csrf||'');
@@ -269,6 +270,43 @@
     if(form.dataset.proposalBound) return; form.dataset.proposalBound='1';
     const est=form.querySelector('[data-proposal-estimate]');
     est?.addEventListener('change',()=>{ const opt=est.selectedOptions[0]; if(!opt) return; const title=form.querySelector('[data-proposal-title]'); const client=form.querySelector('[data-proposal-client]'); const loc=form.querySelector('[data-proposal-location]'); const type=form.querySelector('[data-proposal-type]'); const amount=form.querySelector('[data-proposal-amount]'); if(title&&!title.value) title.value=opt.dataset.title||''; if(client&&!client.value) client.value=opt.dataset.client||''; if(loc&&!loc.value) loc.value=opt.dataset.location||''; if(type&&opt.dataset.type) type.value=opt.dataset.type; if(amount&&num(amount.value)<=0) amount.value=opt.dataset.amount||0; });
+  }
+  function initPlanTakeoff(form){
+    if(form.dataset.planBound) return; form.dataset.planBound='1';
+    const scaleInput=form.querySelector('[data-plan-scale]');
+    const counters={legend:form.querySelectorAll('[data-plan-row="legend"]').length,materials:form.querySelectorAll('[data-plan-row="materials"]').length};
+    const planMoney=v=>'PHP '+num(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+    const scaleFactor=()=>{ const raw=(scaleInput?.value||'1:100').split(':')[1]; return num(raw)||100; };
+    const template=(type,idx)=>{
+      if(type==='legend') return `<div class="plan-legend-row" data-plan-row="legend"><input type="color" name="legend[${idx}][color]" value="#2563eb"><input class="form-control form-control-sm" name="legend[${idx}][label]" placeholder="Label"><input class="form-control form-control-sm" name="legend[${idx}][material]" placeholder="Material"><input class="form-control form-control-sm" name="legend[${idx}][unit]" placeholder="Unit"><button class="btn btn-sm btn-outline-danger" type="button" data-plan-remove>Remove</button></div>`;
+      return `<div class="plan-material-row" data-plan-row="materials"><input type="color" name="materials[${idx}][color]" value="#2563eb"><input class="form-control form-control-sm" name="materials[${idx}][material]" placeholder="Material"><input class="form-control form-control-sm" name="materials[${idx}][unit]" value="pcs" placeholder="Unit"><input class="form-control form-control-sm" type="number" step="0.001" name="materials[${idx}][length]" value="0" placeholder="Plan length"><input class="form-control form-control-sm" type="number" step="0.001" name="materials[${idx}][width]" value="0" placeholder="Plan width"><input class="form-control form-control-sm" type="number" step="0.001" name="materials[${idx}][height]" value="0" placeholder="Height/thick"><input class="form-control form-control-sm" type="number" step="0.001" name="materials[${idx}][area]" value="0" placeholder="Area sqm"><input class="form-control form-control-sm" type="number" step="0.001" name="materials[${idx}][qty]" value="0" placeholder="Qty"><input class="form-control form-control-sm" type="number" step="0.01" name="materials[${idx}][unit_cost]" value="0" placeholder="Unit cost"><input class="form-control form-control-sm" type="number" step="0.01" name="materials[${idx}][waste_percent]" value="5" placeholder="Waste %"><div class="plan-row-total" data-plan-line-total>PHP 0.00</div><button class="btn btn-sm btn-outline-danger" type="button" data-plan-remove>Remove</button></div>`;
+    };
+    const setTotal=(key,value)=>{ const el=form.querySelector(`[data-plan-total="${key}"]`); if(el) el.textContent=value; };
+    const recalc=()=>{
+      const scale=scaleFactor(); let qtySum=0, areaSum=0, costSum=0;
+      form.querySelectorAll('[data-plan-row="materials"]').forEach(row=>{
+        const length=num(row.querySelector('[name*="[length]"]')?.value), width=num(row.querySelector('[name*="[width]"]')?.value), height=num(row.querySelector('[name*="[height]"]')?.value);
+        const areaInput=row.querySelector('[name*="[area]"]'), qtyInput=row.querySelector('[name*="[qty]"]');
+        const calculatedArea=length>0&&width>0 ? length*scale*width*scale : num(areaInput?.value);
+        const calculatedQty=length>0&&width>0&&height>0 ? calculatedArea*height : num(qtyInput?.value);
+        if(length>0&&width>0&&areaInput) areaInput.value=calculatedArea.toFixed(3);
+        if(length>0&&width>0&&height>0&&qtyInput) qtyInput.value=calculatedQty.toFixed(3);
+        const qty=num(qtyInput?.value), area=num(areaInput?.value), cost=qty*num(row.querySelector('[name*="[unit_cost]"]')?.value)*(1+num(row.querySelector('[name*="[waste_percent]"]')?.value)/100);
+        qtySum+=qty; areaSum+=area; costSum+=cost;
+        const total=row.querySelector('[data-plan-line-total]'); if(total) total.textContent=planMoney(cost);
+      });
+      form.querySelector('[data-plan-scale-label]')?.replaceChildren(document.createTextNode(scaleInput?.value||'1:100'));
+      setTotal('qty',qtySum.toFixed(3)); setTotal('area',areaSum.toFixed(3)+' sqm'); setTotal('cost',planMoney(costSum));
+    };
+    form.addEventListener('input',recalc);
+    form.addEventListener('change',recalc);
+    form.addEventListener('click',e=>{
+      const add=e.target.closest('[data-plan-add]');
+      if(add){ const type=add.dataset.planAdd; const wrap=form.querySelector(`[data-plan-rows="${type}"]`); if(wrap){ wrap.insertAdjacentHTML('beforeend',template(type,counters[type]++)); recalc(); } }
+      const remove=e.target.closest('[data-plan-remove]');
+      if(remove){ remove.closest('[data-plan-row]')?.remove(); recalc(); }
+    });
+    recalc();
   }
   function initAttendanceBoard(form){
     if(form.dataset.attendanceBound) return; form.dataset.attendanceBound='1';

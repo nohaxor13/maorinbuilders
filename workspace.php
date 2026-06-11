@@ -3,7 +3,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/helpers.php';
 redirect_if_not_logged_in();
 ensure_maorin_workspace_tables($pdo);
-mb_require_any_permission($pdo, ['view_projects','view_estimates','view_proposals','view_finance','view_hr','view_inventory','view_documents','view_reports']);
+mb_require_any_permission($pdo, ['view_projects','view_estimates','view_proposals','view_plans','view_finance','view_hr','view_inventory','view_documents','view_reports']);
 $title = 'Workspace';
 $extraStylesheets = ['assets/css/workspace.css','assets/css/proposal-letter.css'];
 $pageContainerClass = 'container-fluid px-3 px-lg-4 px-xxl-5';

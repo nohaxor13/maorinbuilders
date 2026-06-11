@@ -126,30 +126,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$pageContainerClass = 'container-fluid';
+$pageContainerClass = 'container';
 include "templates/header.php";
 ?>
 <style>
-.aj-form-shell{max-width:1180px;margin:0 auto}
-.aj-form-card{background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:22px;box-shadow:0 12px 34px rgba(15,23,42,.08)}
-.aj-form-title h1{font-size:1.35rem;margin:0}
-.aj-form-title p{margin:.25rem 0 0;color:#64748b}
+.aj-form-title h3{margin:0}
 </style>
 
-<div class="aj-form-shell">
-  <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
-    <div class="aj-form-title">
-      <h1><?= htmlspecialchars($isEdit ? 'Edit ' . $config['short'] . ' Entry' : $config['entry_label']) ?></h1>
-      <p><?= htmlspecialchars($config['label']) ?></p>
+<div class="card p-4">
+  <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap aj-form-title">
+    <div>
+      <h3><?= htmlspecialchars($isEdit ? 'Edit ' . $config['short'] . ' Entry' : $config['entry_label']) ?></h3>
+      <div class="text-muted small mt-1"><?= htmlspecialchars($config['label']) ?></div>
     </div>
-    <a class="btn btn-outline-secondary" href="<?= htmlspecialchars(mb_journal_list_url($type)) ?>">Back to Journal</a>
+    <a class="btn btn-outline-secondary btn-sm" href="<?= htmlspecialchars(mb_journal_list_url($type)) ?>">Back to Journal</a>
   </div>
 
   <?php if ($errors): ?>
-    <div class="alert alert-warning"><?= htmlspecialchars(implode(' ', $errors)) ?></div>
+    <div class="alert alert-warning mt-3"><?= htmlspecialchars(implode(' ', $errors)) ?></div>
   <?php endif; ?>
 
-  <form class="aj-form-card" method="post" autocomplete="off">
+  <form method="post" class="mt-3" autocomplete="off">
     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
     <input type="hidden" name="type" value="<?= htmlspecialchars($type) ?>">
     <input type="hidden" name="id" value="<?= (int)$id ?>">
