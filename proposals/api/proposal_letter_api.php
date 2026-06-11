@@ -17,6 +17,9 @@ if($action==='save_letter'){
   $body=mb_proposal_letter_sanitize_html($_POST['body']??'');
   if(!$body) mb_json(['ok'=>false,'message'=>'Letter body is required.']);
   $proposalId=(int)($_POST['proposal_id']??0);
+  $letterId=(int)($_POST['letter_id']??0);
+  $saveStatus=$_POST['status']??'draft';
+  if(!in_array($saveStatus, ['draft','final','submitted','approved','rejected'], true)) $saveStatus='draft';
   $headerMode=trim($_POST['header_mode']??'text');
   $headerTitle=trim($_POST['header_title']??'Maorin Builders');
   $headerSubtitle=trim($_POST['header_subtitle']??'Construction • Renovation • Design & Build');
@@ -36,14 +39,30 @@ if($action==='save_letter'){
   }
   if($db instanceof PDO){
     $db->beginTransaction();
-    $stmt=$db->prepare("INSERT INTO proposal_letters (proposal_id,letter_number,template_type,subject,body,paper_size,prepared_by,approved_by,status) VALUES (?,?,?,?,?,?,?,?,?)");
-    $stmt->execute([$proposalId,'LTR-'.date('Ymd-His'),$_POST['template_type']??'Custom Template',$_POST['subject']??'', $body, $_POST['paper_size']??'A4', $_POST['prepared_by']??'', $_POST['approved_by']??'', $_POST['status']??'draft']);
+    $savedLetterId=0;
+    $existing=null;
+    if($letterId>0){
+      $existingStmt=$db->prepare("SELECT * FROM proposal_letters WHERE id=? AND proposal_id=?");
+      $existingStmt->execute([$letterId,$proposalId]);
+      $existing=$existingStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+    if($existing && $existing['status']==='draft'){
+      $stmt=$db->prepare("UPDATE proposal_letters SET template_type=?,subject=?,body=?,paper_size=?,prepared_by=?,approved_by=?,status=?,updated_at=NOW() WHERE id=? AND proposal_id=?");
+      $stmt->execute([$_POST['template_type']??'Custom Template',$_POST['subject']??'', $body, $_POST['paper_size']??'A4', $_POST['prepared_by']??'', $_POST['approved_by']??'', $saveStatus, $letterId, $proposalId]);
+      $savedLetterId=$letterId;
+    }else{
+      $letterNumber='LTR-'.date('Ymd-His');
+      if($existing && !empty($existing['letter_number'])) $letterNumber=$existing['letter_number'].'-REV-'.date('His');
+      $stmt=$db->prepare("INSERT INTO proposal_letters (proposal_id,letter_number,template_type,subject,body,paper_size,prepared_by,approved_by,status) VALUES (?,?,?,?,?,?,?,?,?)");
+      $stmt->execute([$proposalId,$letterNumber,$_POST['template_type']??'Custom Template',$_POST['subject']??'', $body, $_POST['paper_size']??'A4', $_POST['prepared_by']??'', $_POST['approved_by']??'', $saveStatus]);
+      $savedLetterId=(int)$db->lastInsertId();
+    }
     $settingsStmt=$db->prepare("INSERT INTO proposal_letter_settings (proposal_id,header_mode,header_title,header_subtitle,header_line1,header_line2,header_image_path,show_header)
       VALUES (?,?,?,?,?,?,?,?)
       ON DUPLICATE KEY UPDATE header_mode=VALUES(header_mode),header_title=VALUES(header_title),header_subtitle=VALUES(header_subtitle),header_line1=VALUES(header_line1),header_line2=VALUES(header_line2),header_image_path=VALUES(header_image_path),show_header=VALUES(show_header)");
     $settingsStmt->execute([$proposalId,$headerMode,$headerTitle,$headerSubtitle,$headerLine1,$headerLine2,$headerImagePath,$showHeader]);
     $db->commit();
-    mb_json(['ok'=>true,'letter_id'=>$db->lastInsertId()]);
+    mb_json(['ok'=>true,'letter_id'=>$savedLetterId,'saved_status'=>$saveStatus,'header_image_path'=>$headerImagePath]);
   }
   mb_json(['ok'=>true,'message'=>'No PDO connection detected; wire mb_db() to your config.php if needed.']);
 }

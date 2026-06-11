@@ -5,7 +5,7 @@ if (!function_exists('mb_money')) {
 function mb_proposal_templates(){ return ['Residential Construction Proposal','Commercial Construction Proposal','Renovation Proposal','Interior Fit-Out Proposal','Design and Build Proposal','General Contractor Proposal','Custom Template']; }
 function mb_proposal_letter_body_blocks(array $d, string $type='Residential Construction Proposal'): array {
   $g = function(string $k, string $def='') use ($d) { return htmlspecialchars((string)($d[$k] ?? $def), ENT_QUOTES, 'UTF-8'); };
-  $clientBlock = trim($g('client_name','Client Name').($g('client_address') ? "\n".$g('client_address') : ''));
+  $money = function(string $k, string $def='0.00') use ($d) { return htmlspecialchars(mb_money($d[$k] ?? $def), ENT_QUOTES, 'UTF-8'); };
   $overview = [
     ['Proposal No.', $g('proposal_number')],
     ['Project Code', $g('project_code')],
@@ -24,14 +24,14 @@ function mb_proposal_letter_body_blocks(array $d, string $type='Residential Cons
     '<h3>Project Overview</h3><table><tbody>'.implode('', array_map(fn($r) => '<tr><td><strong>'.$r[0].'</strong></td><td>'.$r[1].'</td></tr>', $overview)).'<tr><td><strong>Estimated Duration</strong></td><td>'.$g('estimated_duration','To be discussed').'</td></tr></tbody></table>',
     '<h3>Scope of Work</h3><p>'.$g('scope_of_work','To be finalized based on approved plans, site conditions, and client requirements.').'</p>',
     '<h3>Project Cost Summary</h3><table class="proposal-cost-table"><thead><tr><th>Description</th><th>Amount</th></tr></thead><tbody>'
-      .'<tr><td>Materials Cost</td><td>₱'.$g('materials_cost','0.00').'</td></tr>'
-      .'<tr><td>Labor Cost</td><td>₱'.$g('labor_cost','0.00').'</td></tr>'
-      .'<tr><td>Equipment Cost</td><td>₱'.$g('equipment_cost','0.00').'</td></tr>'
-      .'<tr><td>Professional Fee</td><td>₱'.$g('professional_fee','0.00').'</td></tr>'
-      .'<tr><td>Other Charges</td><td>₱'.$g('other_charges','0.00').'</td></tr>'
-      .'<tr><td><strong>Total Project Cost</strong></td><td><strong>₱'.$g('total_amount','0.00').'</strong></td></tr>'
+      .'<tr><td>Materials Cost</td><td>P'.$money('materials_cost').'</td></tr>'
+      .'<tr><td>Labor Cost</td><td>P'.$money('labor_cost').'</td></tr>'
+      .'<tr><td>Equipment Cost</td><td>P'.$money('equipment_cost').'</td></tr>'
+      .'<tr><td>Professional Fee</td><td>P'.$money('professional_fee').'</td></tr>'
+      .'<tr><td>Other Charges</td><td>P'.$money('other_charges').'</td></tr>'
+      .'<tr><td><strong>Total Project Cost</strong></td><td><strong>P'.$money('total_amount').'</strong></td></tr>'
       .'</tbody></table>',
-    $g('estimate_no') ? '<h3>Estimate Reference</h3><p>Based on estimate <strong>'.$g('estimate_no').'</strong> with total <strong>₱'.$g('estimate_total','0.00').'</strong>.</p>' : '',
+    $g('estimate_no') ? '<h3>Estimate Reference</h3><p>Based on estimate <strong>'.$g('estimate_no').'</strong> with total <strong>P'.$money('estimate_total').'</strong>.</p>' : '',
     '<h3>Payment Terms</h3><p>'.$g('payment_terms','Payment terms shall be discussed and finalized upon approval of this proposal.').'</p>',
     $g('exclusions') ? '<h3>Exclusions</h3><p>'.$g('exclusions').'</p>' : '',
     '<h3>Validity of Proposal</h3><p>This proposal shall remain valid until <strong>'.$g('validity_date','the stated validity date').'</strong>.</p>',
