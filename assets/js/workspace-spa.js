@@ -17,6 +17,16 @@
     if(!res.ok) throw new Error(html.replace(/<[^>]*>/g,'').trim()||'Request failed');
     return html;
   }
+  async function fetchModalHtml(module, mode, id){
+    const url=new URL(window.MB_WORKSPACE.api, window.location.href);
+    url.searchParams.set('module',module);
+    url.searchParams.set('mode',mode);
+    if(id) url.searchParams.set('id',id);
+    const res=await fetch(url,{headers:{'X-Requested-With':'fetch'}});
+    const html=await res.text();
+    if(!res.ok) throw new Error(html.replace(/<[^>]*>/g,'').trim()||'Request failed');
+    return html;
+  }
   async function load(module){
     active=module||'overview'; location.hash=active;
     document.querySelectorAll('[data-module]').forEach(el=>el.classList.toggle('active',el.dataset.module===active));
@@ -155,6 +165,8 @@
       el.addEventListener('keydown',e=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); open(); } });
     });
     scope.querySelectorAll('[data-ws-edit]').forEach(btn=>{ if(btn.dataset.bound) return; btn.dataset.bound='1'; btn.addEventListener('click',async()=>{ try{ const html=await fetchHtml(btn.dataset.wsEdit,'edit',btn.dataset.id); const old=document.getElementById('workspaceEditMount'); old?.remove(); const mount=document.createElement('div'); mount.id='workspaceEditMount'; mount.innerHTML=html; document.body.appendChild(mount); const modalEl=mount.querySelector('.modal'); new bootstrap.Modal(modalEl).show(); modalEl.addEventListener('hidden.bs.modal',()=>mount.remove(),{once:true}); bindInside(mount); }catch(e){showNotice('danger',e.message);} }); });
+    scope.querySelectorAll('[data-ws-fetch-modal]').forEach(btn=>{ if(btn.dataset.boundFetchModal) return; btn.dataset.boundFetchModal='1'; btn.addEventListener('click',async()=>{ try{ const html=await fetchModalHtml(btn.dataset.wsModule||active,btn.dataset.mode||'list',btn.dataset.id||''); modalShell(btn.dataset.title||'Details',html); }catch(e){ showNotice('danger',e.message||String(e)); } }); });
+    scope.querySelectorAll('[data-ws-post]').forEach(btn=>{ if(btn.dataset.boundWsPost) return; btn.dataset.boundWsPost='1'; btn.addEventListener('click',async()=>{ try{ const payload=JSON.parse(btn.dataset.wsPost||'{}'); if(btn.dataset.confirmAction && !confirm(btn.dataset.confirmAction)) return; await postAction(payload); }catch(e){ showNotice('danger',e.message||String(e)); } }); });
     scope.querySelectorAll('[data-ws-approve-proposal]').forEach(btn=>{ if(btn.dataset.bound) return; btn.dataset.bound='1'; btn.addEventListener('click',async()=>{ if(!confirm('Approve this proposal and create/link a project file?')) return; await postAction({module:'proposals',action:'approve',id:btn.dataset.wsApproveProposal}); }); });
     scope.querySelectorAll('[data-module]').forEach(el=>{ if(el.dataset.boundModule) return; el.dataset.boundModule='1'; el.addEventListener('click',()=>load(el.dataset.module)); });
     scope.querySelectorAll('[data-emp-cat]').forEach(btn=>{ if(btn.dataset.boundCat) return; btn.dataset.boundCat='1'; btn.addEventListener('click',()=>{ const host=btn.closest('#workspaceContent')||scope; host.querySelectorAll('[data-emp-cat]').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); host.querySelectorAll('[data-emp-pane]').forEach(p=>p.classList.toggle('active',p.dataset.empPane===btn.dataset.empCat)); }); });

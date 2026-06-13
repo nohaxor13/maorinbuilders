@@ -6,8 +6,16 @@ $title = 'Projects — Maorin Builders';
 require_feature($pdo, 'public_site');
 $projectHeader = __DIR__ . '/templates/header.php';
 require $projectHeader;
-$projects = $pdo->query("SELECT slug AS id, title, location, year, type, status, cover, summary FROM website_projects ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
-if (!$projects) {
+$isPreview = isset($_GET['preview']) && $_GET['preview'] === '1';
+$canPreviewDrafts = !empty($_SESSION['user_id']) && (
+  current_user_can($pdo, 'manage_projects')
+  || current_user_can($pdo, 'manage_public_projects')
+  || current_user_can($pdo, 'publish_public_projects')
+);
+$where = ($isPreview && $canPreviewDrafts) ? '' : 'WHERE is_published = 1';
+$projects = $pdo->query("SELECT slug AS id, title, location, year, type, status, cover, summary, is_published FROM website_projects $where ORDER BY is_featured DESC, display_order ASC, id DESC")->fetchAll(PDO::FETCH_ASSOC);
+$hasAnyShowcaseRecords = (int)$pdo->query("SELECT COUNT(*) FROM website_projects")->fetchColumn() > 0;
+if (!$projects && !$hasAnyShowcaseRecords) {
   $projects = require __DIR__ . '/data/projects.php';
 }
 
@@ -41,7 +49,12 @@ if ($q !== '') {
   <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
     <div>
       <h1 class="display-6 fw-bold mb-1">Projects</h1>
-      <div class="mb-muted">A showcase of our recent work. Replace placeholders with your real photos anytime.</div>
+      <div class="mb-muted">Selected builds, renovations, and completed spaces delivered by Maorin Builders.</div>
+      <?php if ($hasAnyShowcaseRecords && !$projects && !$isPreview): ?>
+        <div class="small text-muted mt-2">No published showcase projects are available yet.</div>
+      <?php elseif ($isPreview && $canPreviewDrafts): ?>
+        <div class="small text-muted mt-2">Preview mode is showing draft and published showcase records.</div>
+      <?php endif; ?>
     </div>
     <form class="d-flex flex-wrap gap-2" method="get" action="<?= htmlspecialchars(pub_url('/public/projects.php'), ENT_QUOTES, 'UTF-8') ?>">
       <select class="form-select" name="status" style="max-width:220px">

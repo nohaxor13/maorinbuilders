@@ -18,10 +18,21 @@ if (!function_exists('project_media_url')) {
 }
 
 $id = (string)($_GET['id'] ?? '');
+$isPreview = isset($_GET['preview']) && $_GET['preview'] === '1';
+$canPreview = !empty($_SESSION['user_id']) && (
+  current_user_can($pdo, 'manage_projects')
+  || current_user_can($pdo, 'manage_public_projects')
+  || current_user_can($pdo, 'publish_public_projects')
+);
 $project = null;
 
 if ($id !== '') {
-  $st = $pdo->prepare("SELECT * FROM website_projects WHERE slug = ? OR CAST(id AS CHAR) = ? LIMIT 1");
+  $sql = "SELECT * FROM website_projects WHERE (slug = ? OR CAST(id AS CHAR) = ?)";
+  if (!$isPreview || !$canPreview) {
+    $sql .= " AND is_published = 1";
+  }
+  $sql .= " LIMIT 1";
+  $st = $pdo->prepare($sql);
   $st->execute([$id, $id]);
   $project = $st->fetch(PDO::FETCH_ASSOC) ?: null;
 }
@@ -61,7 +72,7 @@ if (!$project) {
   $title = 'Project not found - Maorin Builders';
   require __DIR__ . '/templates/header.php';
   $back = htmlspecialchars(pub_url('/public/projects.php'), ENT_QUOTES, 'UTF-8');
-  echo '<div class="container py-5"><div class="alert alert-warning">Project not found. <a href="' . $back . '">Back to projects</a>.</div></div>';
+  echo '<div class="container py-5"><div class="alert alert-warning">This project is not available. <a href="' . $back . '">Back to projects</a>.</div></div>';
   require __DIR__ . '/templates/footer.php';
   exit;
 }
@@ -80,9 +91,9 @@ if (!is_array($materials)) {
 
 $gallery = [];
 if (!empty($project['id'])) {
-  $stGallery = $pdo->prepare("SELECT path FROM website_project_media WHERE project_id = ? AND media_type = 'gallery' ORDER BY created_at DESC, id DESC");
+  $stGallery = $pdo->prepare("SELECT path, caption, alt_text FROM website_project_media WHERE project_id = ? AND media_type = 'gallery' ORDER BY sort_order ASC, id ASC");
   $stGallery->execute([(int)$project['id']]);
-  $gallery = array_map(fn($r) => (string)$r['path'], $stGallery->fetchAll(PDO::FETCH_ASSOC) ?: []);
+  $gallery = $stGallery->fetchAll(PDO::FETCH_ASSOC) ?: [];
 }
 if (!$gallery) {
   $gallery = $project['gallery'] ?? [];
@@ -135,6 +146,15 @@ $afterUrl = project_media_url($after, pub_url('/assets/img/projects/p1_after.svg
       </div>
       <p class="mb-4"><?= htmlspecialchars((string)($project['summary'] ?? ''), ENT_QUOTES, 'UTF-8') ?></p>
 
+      <?php if (!empty($project['description'])): ?>
+        <div class="card border-0 shadow-sm rounded-4 mb-3">
+          <div class="card-body p-4">
+            <div class="h5 mb-2">Project Overview</div>
+            <div class="mb-0"><?= nl2br(htmlspecialchars((string)$project['description'], ENT_QUOTES, 'UTF-8')) ?></div>
+          </div>
+        </div>
+      <?php endif; ?>
+
       <?php if (!empty($materials)): ?>
         <div class="card border-0 shadow-sm rounded-4 mb-3">
           <div class="card-body p-4">
@@ -183,9 +203,9 @@ $afterUrl = project_media_url($after, pub_url('/assets/img/projects/p1_after.svg
             <div class="row g-3">
               <?php foreach ($gallery as $img): ?>
                 <div class="col-6">
-                  <?php $imgUrl = project_media_url((string)$img, pub_url('/assets/img/projects/residence.svg')); ?>
+                  <?php $imgUrl = project_media_url((string)($img['path'] ?? $img), pub_url('/assets/img/projects/residence.svg')); ?>
                   <a href="<?= htmlspecialchars($imgUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">
-                    <img class="mb-portfolio-img" src="<?= htmlspecialchars($imgUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Gallery image" onerror="this.onerror=null;this.src='<?= htmlspecialchars(pub_url('/assets/img/projects/residence.svg'), ENT_QUOTES, 'UTF-8') ?>';">
+                    <img class="mb-portfolio-img" src="<?= htmlspecialchars($imgUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars((string)($img['alt_text'] ?? 'Gallery image'), ENT_QUOTES, 'UTF-8') ?>" onerror="this.onerror=null;this.src='<?= htmlspecialchars(pub_url('/assets/img/projects/residence.svg'), ENT_QUOTES, 'UTF-8') ?>';">
                   </a>
                 </div>
               <?php endforeach; ?>
