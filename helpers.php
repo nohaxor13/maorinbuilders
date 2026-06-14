@@ -149,6 +149,9 @@ if (!function_exists('permission_catalog')) {
             'manage_public_projects' => 'Manage Public Project Showcase',
             'publish_public_projects' => 'Publish Public Project Showcase',
             'delete_public_projects' => 'Delete Public Project Showcase',
+            'view_estimator' => 'View Estimator Workspace',
+            'manage_estimator' => 'Manage Estimator Settings',
+            'manage_estimator_leads' => 'Manage Estimator Leads',
             'view_estimates' => 'View Estimates',
             'manage_estimates' => 'Manage Estimates',
             'view_proposals' => 'View Proposals',
@@ -186,12 +189,14 @@ if (!function_exists('default_role_permissions')) {
             'engineer_owner' => [
                 'view_account_dashboard','view_projects','manage_projects','view_estimates','manage_estimates',
                 'manage_public_projects','publish_public_projects','delete_public_projects',
+                'view_estimator','manage_estimator','manage_estimator_leads',
                 'view_proposals','manage_proposals','view_plans','manage_plans','view_finance','view_inventory',
                 'view_documents','manage_documents','view_reports','view_inquiries','manage_client_portal','manage_tasks'
             ],
             'assistant' => [
                 'view_account_dashboard','view_journal','create_journal','edit_journal','export_journal','import_journal',
                 'view_projects','manage_projects','manage_public_projects','publish_public_projects',
+                'view_estimator','manage_estimator','manage_estimator_leads',
                 'view_estimates','manage_estimates','view_proposals','manage_proposals',
                 'view_finance','manage_expenses','manage_taxes','manage_ledgers','manage_bills','manage_invoices','manage_receipts','manage_permits',
                 'view_hr','manage_employees','manage_attendance','manage_payroll','manage_insurance',
@@ -537,6 +542,7 @@ if (!function_exists('feature_catalog')) {
                 'account_dashboard' => 'Account Dashboard',
                 'workspace_overview' => 'Workspace Overview',
                 'projects' => 'Projects',
+                'estimator' => 'Estimator Workspace',
                 'estimates' => 'Estimates',
                 'proposals' => 'Proposals',
                 'plans' => 'Plans',

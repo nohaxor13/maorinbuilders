@@ -3,7 +3,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/helpers.php';
 redirect_if_not_logged_in();
 ensure_maorin_workspace_tables($pdo);
-mb_require_any_permission($pdo, ['view_projects','view_estimates','view_proposals','view_plans','view_finance','view_hr','view_inventory','view_documents','view_reports']);
+mb_require_any_permission($pdo, ['view_projects','view_estimator','view_estimates','view_proposals','view_plans','view_finance','view_hr','view_inventory','view_documents','view_reports']);
 $title = 'Workspace';
 $extraStylesheets = ['assets/css/workspace.css','assets/css/proposal-letter.css'];
 $pageContainerClass = 'container-fluid px-3 px-lg-4 px-xxl-5';
@@ -30,6 +30,7 @@ $name = $_SESSION['name'] ?? 'User';
         <ul class="nav nav-pills workspace-tabs" id="workspaceTabs" role="tablist">
           <li class="nav-item"><button class="nav-link active" type="button" data-module="overview">Overview</button></li>
           <?php if (current_user_can($pdo, 'view_projects')): ?><li class="nav-item"><button class="nav-link" type="button" data-module="projects">Projects</button></li><?php endif; ?>
+          <?php if (current_user_can($pdo, 'view_estimator') && feature_is_enabled($pdo, 'estimator')): ?><li class="nav-item"><button class="nav-link" type="button" data-module="estimator">Estimator</button></li><?php endif; ?>
           <?php if (current_user_can($pdo, 'view_estimates')): ?><li class="nav-item"><button class="nav-link" type="button" data-module="estimates">Estimates</button></li><?php endif; ?>
           <?php if (current_user_can($pdo, 'view_proposals')): ?><li class="nav-item"><button class="nav-link" type="button" data-module="proposals">Proposals</button></li><?php endif; ?>
           <li class="nav-item dropdown">
