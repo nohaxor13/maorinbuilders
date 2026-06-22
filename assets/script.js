@@ -425,7 +425,7 @@
     }
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
+  function initPurchaseForm() {
     // Reset addressDirty when page loads; it becomes true only on user edits
     addressDirty = false;
 
@@ -434,5 +434,9 @@
     // Initial sync: if using *_view fields, mirror hidden to view and run recalc once
     fullSyncFromHidden();
     recalc();
-  });
+  }
+
+  window.initPurchaseForm = initPurchaseForm;
+
+  document.addEventListener("DOMContentLoaded", initPurchaseForm);
 })(); // scoped IIFE

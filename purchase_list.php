@@ -120,6 +120,22 @@ td.col-desc > .desc-box{
   background: #fff;
   box-shadow: 0 -2px 8px rgba(0,0,0,.06);
 }
+.purchase-edit-modal .modal-dialog{
+  max-width:min(1100px,calc(100vw - 2rem));
+}
+.purchase-edit-modal .modal-content{
+  border:0;
+  border-radius:20px;
+  overflow:hidden;
+}
+.purchase-edit-modal .modal-body{
+  max-height:calc(100vh - 11rem);
+  overflow:auto;
+  background:#f8fafc;
+}
+.purchase-edit-modal .modal-header{
+  background:linear-gradient(135deg,#eff6ff 0%,#ffffff 100%);
+}
 </style>
 
 <div class="page-root">
@@ -245,6 +261,24 @@ td.col-desc > .desc-box{
 <!-- Toast -->
 <div id="toast" class="position-fixed bottom-0 end-0 p-3" style="z-index:1080;"></div>
 
+<div class="modal fade purchase-edit-modal" id="purchaseEditModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title mb-1">Edit Purchase Entry</h5>
+          <div class="small text-muted">Update your journal entry without leaving this page.</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="purchaseEditModalBody">
+        <div class="py-4 text-center text-muted">Select an entry to edit.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/script.js"></script>
 <script>
 (function(){
   const initialSort = <?= json_encode($_GET['sort'] ?? 'date_desc') ?>;
@@ -269,6 +303,10 @@ td.col-desc > .desc-box{
 
 
   const exportEl = q('#exportXlsx');
+  const editModalEl = q('#purchaseEditModal');
+  const editModalBody = q('#purchaseEditModalBody');
+  let editModalEntryId = 0;
+  let editModalPendingClose = false;
 
   const monthEl = q('#monthPick');
   const yearEl  = q('#yearPick');
@@ -361,6 +399,79 @@ td.col-desc > .desc-box{
       </div>`;
     q('#toast').appendChild(el);
     setTimeout(()=>el.remove(), 3500);
+  }
+
+  function getEditModal(){
+    if(!editModalEl || !window.bootstrap) return null;
+    return bootstrap.Modal.getOrCreateInstance(editModalEl);
+  }
+
+  function bindModalEditForm(){
+    if(typeof window.initPurchaseForm === 'function'){
+      window.initPurchaseForm();
+    }
+    const form = editModalBody?.querySelector('#purchaseForm');
+    if(!form || form.dataset.modalBound === '1') return;
+    form.dataset.modalBound = '1';
+    form.addEventListener('submit', async (ev)=>{
+      ev.preventDefault();
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if(submitBtn) submitBtn.disabled = true;
+      try{
+        const fd = new FormData(form);
+        fd.set('modal', '1');
+        fd.set('id', String(editModalEntryId || fd.get('id') || '0'));
+        const actionUrl = form.getAttribute('action') || `purchase_edit.php?id=${encodeURIComponent(String(editModalEntryId || 0))}&modal=1`;
+        const res = await fetch(actionUrl, {
+          method: 'POST',
+          body: fd,
+          credentials: 'same-origin',
+          headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const data = await res.json().catch(()=>({ok:false,message:'Invalid response from edit form.'}));
+        if(data.html && editModalBody){
+          editModalBody.innerHTML = data.html;
+          bindModalEditForm();
+        }
+        if(data.ok){
+          editModalPendingClose = true;
+          toast(data.message || 'Entry updated successfully.','success');
+          loadJournal();
+          setTimeout(()=>{
+            const modal = getEditModal();
+            modal?.hide();
+          }, 350);
+        }else if(data.message){
+          toast(data.message, data.already_saved ? 'info' : 'warning');
+        }
+      }catch(err){
+        toast(esc(err.message || err), 'danger');
+      }finally{
+        const nextSubmitBtn = editModalBody?.querySelector('#purchaseForm button[type="submit"]');
+        if(nextSubmitBtn) nextSubmitBtn.disabled = false;
+      }
+    });
+  }
+
+  async function openEditModal(id){
+    const modal = getEditModal();
+    if(!modal || !editModalBody) return;
+    editModalEntryId = Number(id || 0);
+    editModalPendingClose = false;
+    editModalBody.innerHTML = `<div class="py-4 text-center text-muted">Loading edit form...</div>`;
+    modal.show();
+    try{
+      const res = await fetch(`purchase_edit.php?id=${encodeURIComponent(String(editModalEntryId))}&modal=1`, {
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      if(!res.ok) throw new Error(`Unable to load edit form (HTTP ${res.status}).`);
+      const html = await res.text();
+      editModalBody.innerHTML = html;
+      bindModalEditForm();
+    }catch(err){
+      editModalBody.innerHTML = `<div class="alert alert-danger mb-0">${esc(err.message || err)}</div>`;
+    }
   }
 
   function fmt(n){
@@ -484,7 +595,7 @@ td.col-desc > .desc-box{
           : `<span class="chip chip-nvat">NVAT</span>`;
 
         const editBtn = e.is_owner
-          ? `<a class="btn btn-sm btn-outline-primary me-1" href="purchase_edit.php?id=${esc(e.id)}" title="Edit"><i class="bi bi-pencil"></i></a>`
+          ? `<button type="button" class="btn btn-sm btn-outline-primary me-1 btn-edit" data-id="${esc(e.id)}" title="Edit"><i class="bi bi-pencil"></i></button>`
           : '';
 
         const delBtn = e.is_owner
@@ -579,11 +690,25 @@ td.col-desc > .desc-box{
       loadJournal();
       return;
     }
+    const editBtn = ev.target.closest('.btn-edit');
+    if(editBtn){
+      const id = editBtn.getAttribute('data-id');
+      if(id) openEditModal(id);
+      return;
+    }
     const btn = ev.target.closest('.btn-delete');
     if(!btn) return;
     const id = btn.getAttribute('data-id');
     if(!id) return;
     if(confirm('Hard delete this entry permanently? This cannot be undone.')) hardDelete(id);
+  });
+
+  editModalEl?.addEventListener('hidden.bs.modal', ()=>{
+    editModalEntryId = 0;
+    if(editModalBody && editModalPendingClose){
+      editModalBody.innerHTML = `<div class="py-4 text-center text-muted">Select an entry to edit.</div>`;
+    }
+    editModalPendingClose = false;
   });
 
   // Initial: read dropdown (default is All)
