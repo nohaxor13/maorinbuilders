@@ -75,6 +75,7 @@ function dash_media_url(?string $path): string {
 $userName = $_SESSION['name'] ?? $_SESSION['full_name'] ?? $_SESSION['username'] ?? 'Maorin User';
 $userEmail = $_SESSION['email'] ?? '';
 $role = $_SESSION['role'] ?? $_SESSION['user_type'] ?? 'Staff';
+$userId = (int)($_SESSION['user_id'] ?? 0);
 $profilePhoto = '';
 
 if ($db instanceof PDO) {
@@ -117,16 +118,51 @@ if ($db instanceof PDO) {
     }
 }
 
-$totalEntries = dash_scalar($db, "SELECT COUNT(*) FROM purchase_entries");
-$totalCash = dash_scalar($db, "SELECT COALESCE(SUM(cash),0) FROM purchase_entries");
-$weekEntries = dash_scalar($db, "SELECT COUNT(*) FROM purchase_entries WHERE date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)");
+$recentSearch = trim((string)($_GET['q'] ?? ''));
+$recentEntryParams = [$userId];
+$recentEntryWhere = "user_id = ?";
+if ($recentSearch !== '') {
+    $recentEntryWhere .= " AND (supplier LIKE ? OR project_name LIKE ? OR category LIKE ? OR reference LIKE ?)";
+    $like = '%' . $recentSearch . '%';
+    array_push($recentEntryParams, $like, $like, $like, $like);
+}
 
-$rows = dash_rows($db, "SELECT date, supplier, project_name, category, cash, vat_nvat, reference FROM purchase_entries ORDER BY date DESC, id DESC LIMIT 6");
+$totalEntries = $userId > 0 ? dash_scalar($db, "SELECT COUNT(*) FROM purchase_entries WHERE user_id = ?", [$userId]) : 0;
+$totalCash = dash_scalar($db, "SELECT COALESCE(SUM(cash),0) FROM purchase_entries");
+$weekEntries = $userId > 0 ? dash_scalar($db, "SELECT COUNT(*) FROM purchase_entries WHERE user_id = ? AND date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)", [$userId]) : 0;
+
+$rows = $userId > 0
+    ? dash_rows(
+        $db,
+        "SELECT id, date, supplier, project_name, category, cash, vat_nvat, reference
+           FROM purchase_entries
+          WHERE $recentEntryWhere
+          ORDER BY date DESC, id DESC
+          LIMIT 6",
+        $recentEntryParams
+    )
+    : [];
+
+$lastOwnEntry = $userId > 0
+    ? dash_rows(
+        $db,
+        "SELECT id, date, supplier, project_name, category, cash, vat_nvat, reference
+           FROM purchase_entries
+          WHERE user_id = ?
+          ORDER BY date DESC, id DESC
+          LIMIT 1",
+        [$userId]
+    )
+    : [];
+$lastOwnEntry = $lastOwnEntry[0] ?? null;
 
 $activity = [];
 for ($i = 6; $i >= 0; $i--) {
     $d = date('Y-m-d', strtotime("-$i days"));
-    $activity[] = ['label' => date('D', strtotime($d)), 'count' => (int)dash_scalar($db, "SELECT COUNT(*) FROM purchase_entries WHERE date=?", [$d])];
+    $activity[] = [
+        'label' => date('D', strtotime($d)),
+        'count' => $userId > 0 ? (int)dash_scalar($db, "SELECT COUNT(*) FROM purchase_entries WHERE user_id = ? AND date = ?", [$userId, $d]) : 0
+    ];
 }
 
 $dashboard = [
@@ -150,6 +186,7 @@ $dashboard = [
     'activity7' => $activity,
     'recent_entries' => array_map(
         fn($r) => [
+            'id' => (int)($r['id'] ?? 0),
             'date' => $r['date'] ?? '',
             'supplier' => $r['supplier'] ?? '',
             'project' => $r['project_name'] ?? '',
@@ -160,13 +197,23 @@ $dashboard = [
         ],
         $rows
     ),
+    'last_entry' => $lastOwnEntry ? [
+        'id' => (int)($lastOwnEntry['id'] ?? 0),
+        'date' => $lastOwnEntry['date'] ?? '',
+        'supplier' => $lastOwnEntry['supplier'] ?? '',
+        'project' => $lastOwnEntry['project_name'] ?? '',
+        'category' => $lastOwnEntry['category'] ?? '',
+        'cash' => number_format((float)str_replace(',', '', $lastOwnEntry['cash'] ?? 0), 2),
+        'vat_status' => $lastOwnEntry['vat_nvat'] ?? 'VAT',
+        'reference' => $lastOwnEntry['reference'] ?? '',
+    ] : null,
     'inquiries' => [
         'new' => dash_scalar($db, "SELECT COUNT(*) FROM inquiries WHERE status='new'"),
         'contacted' => dash_scalar($db, "SELECT COUNT(*) FROM inquiries WHERE status='contacted'"),
         'closed' => dash_scalar($db, "SELECT COUNT(*) FROM inquiries WHERE status='closed'"),
     ],
     'recent_activity' => [
-        ['title' => 'Recent journal entry added', 'detail' => $rows[0]['supplier'] ?? 'No recent journal entries yet', 'time' => date('M d, Y h:i A')],
+        ['title' => 'Your latest journal entry', 'detail' => $lastOwnEntry['supplier'] ?? 'No journal entries saved by your account yet', 'time' => $lastOwnEntry['date'] ?? date('M d, Y')],
         ['title' => 'Inquiry responded', 'detail' => 'BuildRight Inc.', 'time' => date('M d, Y h:i A')],
         ['title' => 'Password changed', 'detail' => 'Account security updated', 'time' => date('M d, Y h:i A')],
         ['title' => 'New inquiry received', 'detail' => 'Prime Electricals', 'time' => date('M d, Y h:i A')],

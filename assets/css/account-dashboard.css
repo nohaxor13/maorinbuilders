@@ -276,6 +276,30 @@
 .account-dashboard-shell .recent-card{
   overflow:hidden;
 }
+.account-dashboard-shell .last-entry-strip{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;
+  padding:14px 16px;
+  border-bottom:1px solid var(--dash-line);
+  background:linear-gradient(180deg,#f8fbff 0%,#ffffff 100%);
+}
+.account-dashboard-shell .last-entry-strip strong,
+.account-dashboard-shell .last-entry-strip span{
+  display:block;
+}
+.account-dashboard-shell .last-entry-strip strong{
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+  color:#475569;
+  margin-bottom:4px;
+}
+.account-dashboard-shell .last-entry-strip span{
+  font-size:13px;
+  color:#0f172a;
+  font-weight:600;
+}
 .account-dashboard-shell .search-row{
   display:flex;
   align-items:center;
@@ -354,6 +378,11 @@
   color:#0b4a8b;
   text-decoration:none;
   font-weight:700;
+}
+.account-dashboard-shell .empty-state-cell{
+  text-align:center;
+  color:#64748b;
+  padding:22px 14px;
 }
 
 .account-dashboard-shell .security-card,
@@ -476,6 +505,9 @@
   .account-dashboard-shell .search-row{
     width:100%;
     flex-wrap:wrap;
+  }
+  .account-dashboard-shell .last-entry-strip{
+    grid-template-columns:1fr;
   }
   .account-dashboard-shell .search-row input{
     width:100%;

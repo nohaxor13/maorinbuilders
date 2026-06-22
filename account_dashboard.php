@@ -40,7 +40,7 @@ $showAccountSecurity = feature_is_enabled($pdo, 'account_security');
           <img class="avatar-lg" src="<?= e($heroAvatar) ?>" alt="Profile">
           <div class="hero-copy">
             <div class="eyebrow">Welcome back</div>
-            <h1>Welcome back, <?= e($heroName) ?>! <span aria-hidden="true">👋</span></h1>
+            <h1>Welcome back, <?= e($heroName) ?>! <span aria-hidden="true">&#128075;</span></h1>
             <p>Stay productive and keep your purchase journal up to date.</p>
             <div class="hero-tags">
               <?php foreach ($heroMeta as $meta): ?>
@@ -56,7 +56,7 @@ $showAccountSecurity = feature_is_enabled($pdo, 'account_security');
         $kpiClasses = ['blue','orange','purple','teal','rose'];
         $visibleKpis = array_values(array_filter($dashboard['kpis'], fn($kpi) => ($kpi['label'] ?? '') !== 'Total Cash'));
         foreach ($visibleKpis as $i => $kpi):
-          $tone = $kpi['tone'] ?? $kpiClasses[$i] ?? 'blue';
+            $tone = $kpi['tone'] ?? $kpiClasses[$i] ?? 'blue';
         ?>
           <article class="kpi-card dash-card">
             <div class="kpi-icon tone-<?= e($tone) ?>"><?= e($kpi['icon']) ?></div>
@@ -115,10 +115,31 @@ $showAccountSecurity = feature_is_enabled($pdo, 'account_security');
             <a href="purchase_list.php">View All</a>
           </form>
         </div>
+        <?php if (!empty($dashboard['last_entry'])): ?>
+        <div class="last-entry-strip">
+          <div>
+            <strong>Your last saved entry</strong>
+            <span><?= e($dashboard['last_entry']['date']) ?> | <?= e($dashboard['last_entry']['supplier']) ?></span>
+          </div>
+          <div>
+            <strong>Project</strong>
+            <span><?= e($dashboard['last_entry']['project'] ?: 'No project') ?></span>
+          </div>
+          <div>
+            <strong>Cash</strong>
+            <span>PHP <?= e($dashboard['last_entry']['cash']) ?></span>
+          </div>
+          <div>
+            <strong>OR #</strong>
+            <span><?= e($dashboard['last_entry']['reference'] ?: 'No reference') ?></span>
+          </div>
+        </div>
+        <?php endif; ?>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
+                <th>Entry #</th>
                 <th>Date</th>
                 <th>Supplier</th>
                 <th>Project</th>
@@ -130,22 +151,29 @@ $showAccountSecurity = feature_is_enabled($pdo, 'account_security');
               </tr>
             </thead>
             <tbody>
-              <?php foreach ($dashboard['recent_entries'] as $row): ?>
-                <?php $vatClass = strtolower(str_replace([' ', '_'], '-', (string)$row['vat_status'])); ?>
+              <?php if (!empty($dashboard['recent_entries'])): ?>
+                <?php foreach ($dashboard['recent_entries'] as $row): ?>
+                  <?php $vatClass = strtolower(str_replace([' ', '_'], '-', (string)$row['vat_status'])); ?>
+                  <tr>
+                    <td>#<?= e($row['id']) ?></td>
+                    <td><?= e($row['date']) ?></td>
+                    <td><?= e($row['supplier']) ?></td>
+                    <td><?= e($row['project']) ?></td>
+                    <td><?= e($row['category']) ?></td>
+                    <td class="money">PHP <?= e($row['cash']) ?></td>
+                    <td><span class="vat-chip <?= e($vatClass) ?>"><?= e($row['vat_status']) ?></span></td>
+                    <td><?= e($row['reference']) ?></td>
+                    <td><a class="icon-btn" href="purchase_list.php?q=<?= urlencode((string)($row['reference'] ?: $row['id'])) ?>">View</a></td>
+                  </tr>
+                <?php endforeach; ?>
+              <?php else: ?>
                 <tr>
-                  <td><?= e($row['date']) ?></td>
-                  <td><?= e($row['supplier']) ?></td>
-                  <td><?= e($row['project']) ?></td>
-                  <td><?= e($row['category']) ?></td>
-                  <td class="money">₱<?= e($row['cash']) ?></td>
-                  <td><span class="vat-chip <?= e($vatClass) ?>"><?= e($row['vat_status']) ?></span></td>
-                  <td><?= e($row['reference']) ?></td>
-                  <td><a class="icon-btn" href="purchase_list.php?q=<?= urlencode($row['reference']) ?>">View</a></td>
+                  <td colspan="9" class="empty-state-cell">No purchase journal entries found for your account yet.</td>
                 </tr>
-              <?php endforeach; ?>
+              <?php endif; ?>
             </tbody>
           </table>
-          <div class="view-all-row"><a href="purchase_list.php">View all entries →</a></div>
+          <div class="view-all-row"><a href="purchase_list.php">View all entries &rarr;</a></div>
         </div>
       </section>
       <?php endif; ?>
@@ -167,7 +195,7 @@ $showAccountSecurity = feature_is_enabled($pdo, 'account_security');
           <div class="mini-box teal"><span>Contacted</span><b><?= e($dashboard['inquiries']['contacted']) ?></b></div>
           <div class="mini-box rose"><span>Closed</span><b><?= e($dashboard['inquiries']['closed']) ?></b></div>
         </div>
-        <a class="text-link" href="inquiries.php">View inquiries →</a>
+        <a class="text-link" href="inquiries.php">View inquiries &rarr;</a>
       </section>
 
       <?php if ($showAccountActivity): ?>
