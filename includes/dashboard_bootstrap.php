@@ -121,6 +121,8 @@ if ($db instanceof PDO) {
 $recentSearch = trim((string)($_GET['q'] ?? ''));
 $recentEntryParams = [$userId];
 $recentEntryWhere = "user_id = ?";
+// "Last entry" should mean the most recently saved row by this user, not the latest business date.
+$recentEntryOrder = "id DESC";
 if ($recentSearch !== '') {
     $recentEntryWhere .= " AND (supplier LIKE ? OR project_name LIKE ? OR category LIKE ? OR reference LIKE ?)";
     $like = '%' . $recentSearch . '%';
@@ -137,7 +139,7 @@ $rows = $userId > 0
         "SELECT id, date, supplier, project_name, category, cash, vat_nvat, reference
            FROM purchase_entries
           WHERE $recentEntryWhere
-          ORDER BY date DESC, id DESC
+          ORDER BY $recentEntryOrder
           LIMIT 6",
         $recentEntryParams
     )
@@ -149,7 +151,7 @@ $lastOwnEntry = $userId > 0
         "SELECT id, date, supplier, project_name, category, cash, vat_nvat, reference
            FROM purchase_entries
           WHERE user_id = ?
-          ORDER BY date DESC, id DESC
+          ORDER BY $recentEntryOrder
           LIMIT 1",
         [$userId]
     )
