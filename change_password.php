@@ -3,6 +3,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/helpers.php';
 
 redirect_if_not_logged_in();
+require_feature($pdo, 'account_security');
 
 $error = '';
 $success = '';

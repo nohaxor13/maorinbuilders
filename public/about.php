@@ -1,4 +1,7 @@
 <?php
+require __DIR__ . '/../config.php';
+require __DIR__ . '/../helpers.php';
+require_feature($pdo, 'public_site');
 $company = require __DIR__ . '/data/company.php';
 $p = $company['profile'] ?? [];
 $licenseInfoModalId = 'licenseInfoModal';

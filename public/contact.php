@@ -1,5 +1,9 @@
 <?php
 $title = 'Contact — Maorin Builders';
+require __DIR__ . '/../config.php';
+require __DIR__ . '/../helpers.php';
+require_feature($pdo, 'public_site');
+require_feature($pdo, 'inquiries');
 require __DIR__ . '/templates/header.php';
 
 $company = require __DIR__ . '/data/company.php';

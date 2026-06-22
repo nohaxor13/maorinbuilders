@@ -11,6 +11,7 @@ if (isset($pdo) && $pdo instanceof PDO) {
         echo 'Forbidden';
         exit;
     }
+    require_feature($pdo, 'account_dashboard');
 }
 
 $title = 'Account Dashboard';
@@ -25,6 +26,10 @@ $heroMeta = [
     ['label' => 'Department: ' . $dashboard['user']['department'], 'class' => 'tag-gray'],
     ['label' => 'Last login: ' . $dashboard['user']['last_login'], 'class' => 'tag-gray'],
 ];
+$showQuickActions = feature_is_enabled($pdo, 'account_quick_actions');
+$showRecentEntries = feature_is_enabled($pdo, 'account_recent_entries');
+$showAccountActivity = feature_is_enabled($pdo, 'account_activity');
+$showAccountSecurity = feature_is_enabled($pdo, 'account_security');
 ?>
 
 <div class="account-dashboard-shell">
@@ -89,6 +94,7 @@ $heroMeta = [
           </div>
         </section>
 
+        <?php if ($showQuickActions): ?>
         <aside class="quick-card dash-card">
           <h2>Quick Actions</h2>
           <a class="action-btn primary" href="purchase_new.php">New Entry</a>
@@ -96,8 +102,10 @@ $heroMeta = [
           <a class="action-btn" href="inquiries.php">Inquiries</a>
           <a class="action-btn" href="workspace.php">Reports</a>
         </aside>
+        <?php endif; ?>
       </section>
 
+      <?php if ($showRecentEntries): ?>
       <section class="recent-card dash-card">
         <div class="section-head">
           <h2>Recent Purchase Journal Entries</h2>
@@ -140,14 +148,17 @@ $heroMeta = [
           <div class="view-all-row"><a href="purchase_list.php">View all entries →</a></div>
         </div>
       </section>
+      <?php endif; ?>
     </main>
 
     <aside class="side-col">
-      <section class="dash-card security-card">
-        <div class="section-title">Account Security</div>
-        <p>Keep your account secure with a strong password. We recommend using a strong password.</p>
-        <a class="profile-btn" href="change_password.php">Change Password</a>
-      </section>
+      <?php if ($showAccountSecurity): ?>
+        <section class="dash-card security-card">
+          <div class="section-title">Account Security</div>
+          <p>Keep your account secure with a strong password. We recommend using a strong password.</p>
+          <a class="profile-btn" href="change_password.php">Change Password</a>
+        </section>
+      <?php endif; ?>
 
       <section class="dash-card inquiry-card">
         <div class="section-title">Inquiry Status</div>
@@ -159,6 +170,7 @@ $heroMeta = [
         <a class="text-link" href="inquiries.php">View inquiries →</a>
       </section>
 
+      <?php if ($showAccountActivity): ?>
       <section class="dash-card activity-card">
         <div class="section-title">Recent Activity</div>
         <ul class="activity-list">
@@ -174,6 +186,7 @@ $heroMeta = [
           <?php endforeach; ?>
         </ul>
       </section>
+      <?php endif; ?>
     </aside>
   </div>
 </div>

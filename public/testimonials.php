@@ -4,6 +4,7 @@ $title = "Testimonials";
 
 require __DIR__ . '/../config.php';
 require __DIR__ . '/../helpers.php';
+require_feature($pdo, 'public_site');
 
 $pdo->exec(
   "CREATE TABLE IF NOT EXISTS website_testimonials (

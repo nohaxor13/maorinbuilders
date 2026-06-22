@@ -6,6 +6,7 @@ require __DIR__ . '/helpers.php';
 redirect_if_not_logged_in();
 require_permission($pdo, 'manage_client_portal');
 ensure_client_portal_tables($pdo);
+require_feature($pdo, 'client_portal');
 
 // Optional role gate (uncomment if you want strict)
 // require_role($pdo, ['admin','project_manager','accounting','staff']);

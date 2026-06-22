@@ -6,6 +6,10 @@
 //   /index.php  (accidentally placed at root)
 // =====================================================
 
+require __DIR__ . '/../config.php';
+require __DIR__ . '/../helpers.php';
+require_feature($pdo, 'public_site');
+
 $title = 'Maorin Builders - Construction • Renovation • Design & Build';
 
 $here = __DIR__;

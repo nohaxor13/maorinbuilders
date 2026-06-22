@@ -146,6 +146,12 @@ if (!function_exists('permission_catalog')) {
             'run_database_tools' => 'Run Database Tools',
             'view_projects' => 'View Projects',
             'manage_projects' => 'Manage Projects',
+            'manage_public_projects' => 'Manage Public Project Showcase',
+            'publish_public_projects' => 'Publish Public Project Showcase',
+            'delete_public_projects' => 'Delete Public Project Showcase',
+            'view_estimator' => 'View Estimator Workspace',
+            'manage_estimator' => 'Manage Estimator Settings',
+            'manage_estimator_leads' => 'Manage Estimator Leads',
             'view_estimates' => 'View Estimates',
             'manage_estimates' => 'Manage Estimates',
             'view_proposals' => 'View Proposals',
@@ -182,12 +188,16 @@ if (!function_exists('default_role_permissions')) {
             'admin' => $all,
             'engineer_owner' => [
                 'view_account_dashboard','view_projects','manage_projects','view_estimates','manage_estimates',
+                'manage_public_projects','publish_public_projects','delete_public_projects',
+                'view_estimator','manage_estimator','manage_estimator_leads',
                 'view_proposals','manage_proposals','view_plans','manage_plans','view_finance','view_inventory',
                 'view_documents','manage_documents','view_reports','view_inquiries','manage_client_portal','manage_tasks'
             ],
             'assistant' => [
                 'view_account_dashboard','view_journal','create_journal','edit_journal','export_journal','import_journal',
-                'view_projects','manage_projects','view_estimates','manage_estimates','view_proposals','manage_proposals',
+                'view_projects','manage_projects','manage_public_projects','publish_public_projects',
+                'view_estimator','manage_estimator','manage_estimator_leads',
+                'view_estimates','manage_estimates','view_proposals','manage_proposals',
                 'view_finance','manage_expenses','manage_taxes','manage_ledgers','manage_bills','manage_invoices','manage_receipts','manage_permits',
                 'view_hr','manage_employees','manage_attendance','manage_payroll','manage_insurance',
                 'view_documents','manage_documents','view_reports','view_inquiries','manage_client_portal','manage_tasks'
@@ -522,6 +532,102 @@ if (!function_exists('site_setting_set')) {
              ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)"
         );
         $st->execute([$key, $value]);
+    }
+}
+
+if (!function_exists('feature_catalog')) {
+    function feature_catalog(): array {
+        return [
+            'modules' => [
+                'account_dashboard' => 'Account Dashboard',
+                'workspace_overview' => 'Workspace Overview',
+                'projects' => 'Projects',
+                'estimator' => 'Estimator Workspace',
+                'estimates' => 'Estimates',
+                'proposals' => 'Proposals',
+                'plans' => 'Plans',
+                'finance' => 'Finance',
+                'hr' => 'HR',
+                'inventory' => 'Inventory',
+                'documents' => 'Documents',
+                'reports' => 'Reports',
+                'client_portal' => 'Client Portal',
+                'inquiries' => 'Inquiries',
+                'company_content' => 'Company Content',
+                'public_site' => 'Public Site',
+            ],
+            'sections' => [
+                'account_security' => 'Account Security',
+                'account_quick_actions' => 'Account Quick Actions',
+                'account_recent_entries' => 'Account Recent Entries',
+                'account_activity' => 'Account Activity',
+                'public_hero' => 'Public Home Hero',
+                'public_services_grid' => 'Public Services Grid',
+                'public_projects_grid' => 'Public Projects Grid',
+                'public_testimonials' => 'Public Testimonials',
+                'public_contact_methods' => 'Public Contact Methods',
+                'client_projects' => 'Client Portal Projects',
+                'client_files' => 'Client Portal Files',
+                'client_payments' => 'Client Portal Payments',
+            ],
+        ];
+    }
+}
+
+if (!function_exists('feature_flags_defaults')) {
+    function feature_flags_defaults(): array {
+        $defaults = [];
+        foreach (feature_catalog() as $group) {
+            foreach ($group as $key => $label) {
+                $defaults[$key] = true;
+            }
+        }
+        return $defaults;
+    }
+}
+
+if (!function_exists('feature_flags_get')) {
+    function feature_flags_get(PDO $pdo): array {
+        ensure_site_settings_table($pdo);
+        $raw = (string)site_setting_get($pdo, 'feature_flags', '');
+        $decoded = json_decode($raw, true);
+        $flags = feature_flags_defaults();
+        if (is_array($decoded)) {
+            foreach ($decoded as $key => $value) {
+                if (array_key_exists($key, $flags)) {
+                    $flags[$key] = (bool)$value;
+                }
+            }
+        }
+        return $flags;
+    }
+}
+
+if (!function_exists('feature_flags_set')) {
+    function feature_flags_set(PDO $pdo, array $flags): void {
+        $catalog = feature_flags_defaults();
+        $normalized = [];
+        foreach ($catalog as $key => $default) {
+            $normalized[$key] = !empty($flags[$key]);
+        }
+        site_setting_set($pdo, 'feature_flags', json_encode($normalized, JSON_UNESCAPED_SLASHES));
+    }
+}
+
+if (!function_exists('feature_is_enabled')) {
+    function feature_is_enabled(PDO $pdo, string $key): bool {
+        $flags = feature_flags_get($pdo);
+        return array_key_exists($key, $flags) ? (bool)$flags[$key] : true;
+    }
+}
+
+if (!function_exists('require_feature')) {
+    function require_feature(PDO $pdo, string $key): void {
+        if (!feature_is_enabled($pdo, $key)) {
+            http_response_code(403);
+            echo '<div style="padding:24px;font-family:system-ui,sans-serif"><h1>Feature disabled</h1><p>This feature has been disabled by an administrator.</p></div>';
+            exit;
+        }
     }
 }
 

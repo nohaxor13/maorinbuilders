@@ -3,6 +3,7 @@ declare(strict_types=1);
 require __DIR__ . '/../../config.php';
 require __DIR__ . '/../../helpers.php';
 ensure_client_portal_tables($pdo);
+require_feature($pdo, 'client_portal');
 
 $clientName = '';
 if (is_client_logged_in()) {
@@ -34,7 +35,9 @@ if (is_client_logged_in()) {
     </button>
     <div class="collapse navbar-collapse" id="cpNav">
       <ul class="navbar-nav me-auto">
-        <li class="nav-item"><a class="nav-link" href="index.php">My Projects</a></li>
+        <?php if (function_exists('feature_is_enabled') && feature_is_enabled($pdo, 'client_projects')): ?>
+          <li class="nav-item"><a class="nav-link" href="index.php">My Projects</a></li>
+        <?php endif; ?>
       </ul>
       <div class="d-flex gap-2 align-items-center">
         <?php if (is_client_logged_in()): ?>
